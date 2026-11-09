@@ -1,0 +1,50 @@
+{
+  "floors": [
+    "floor_0.png",
+    "floor_1.png",
+    "floor_2.png",
+    "floor_3.png",
+    "floor_4.png",
+    "floor_5.png",
+    "floor_6.png",
+    "floor_7.png",
+    "floor_8.png"
+  ],
+  "walls": [
+    "wall_0.png"
+  ],
+  "carpets": [
+    "carpet_0.png",
+    "carpet_1.png",
+    "carpet_2.png"
+  ],
+  "characters": [
+    "char_0.png",
+    "char_1.png",
+    "char_2.png",
+    "char_3.png",
+    "char_4.png",
+    "char_5.png"
+  ],
+  "characterPacks": {
+    "classic": [
+      "char_0.png",
+      "char_1.png",
+      "char_2.png",
+      "char_3.png",
+      "char_4.png",
+      "char_5.png"
+    ],
+    "pixel": [
+      "pixel/char_0.png",
+      "pixel/char_1.png",
+      "pixel/char_2.png",
+      "pixel/char_3.png",
+      "pixel/char_4.png",
+      "pixel/char_5.png",
+      "pixel/char_6.png",
+      "pixel/char_7.png"
+    ]
+  },
+  "defaultLayout": "default-layout-1.json"
+}

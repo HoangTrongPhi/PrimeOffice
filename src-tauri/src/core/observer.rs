@@ -1,0 +1,322 @@
+//! The office's live feed. Every tick it reads what is new in each recent transcript and turns the
+//! change into pixel-agents `ServerMessage`s (`agentCreated`, `agentToolStart`, `agentStatus`, …), so
+//! the vendored office UI (`src/office/`) runs unchanged. Pure: no tauri, the caller emits.
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+use serde_json::{json, Value};
+
+use super::providers::{modified_ms, read_lines_from, read_session_bounded, AgentProvider, AgentSession, SessionParser, SessionStatus};
+
+/// What the office shows for an agent; changes between ticks become messages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Shown {
+    Active,
+    /// Turn finished (green check bubble).
+    Done,
+    /// Asked the user something (AskUserQuestion, plan approval).
+    Asking,
+    /// Most likely a permission prompt ("…" bubble).
+    Permission,
+}
+
+struct Tracked {
+    agent_id: u32,
+    parser: Box<dyn SessionParser>,
+    offset: u64,
+    len: u64,
+    mtime: u64,
+    palette: u32,
+    hue_shift: u32,
+    directory: String,
+    tools: Vec<(String, String, String)>,
+    shown: Option<Shown>,
+    context: u64,
+    session: Option<AgentSession>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObserverConfig {
+    /// Sessions whose transcript changed within this many ms are in the office.
+    pub window_ms: u64,
+    /// Project folders to show; empty = every project.
+    pub projects: Vec<PathBuf>,
+}
+
+impl Default for ObserverConfig {
+    fn default() -> Self {
+        ObserverConfig { window_ms: 30 * 60 * 1000, projects: Vec::new() }
+    }
+}
+
+pub struct Observer {
+    providers: Vec<Box<dyn AgentProvider>>,
+    tracked: HashMap<PathBuf, Tracked>,
+    next_id: u32,
+    config: ObserverConfig,
+}
+
+fn palette_for(id: u32) -> (u32, u32) {
+    let n = id.saturating_sub(1);
+    (n % 6, if n < 6 { 0 } else { 45 * (1 + (n / 6 - 1) % 7) })
+}
+
+fn shown_for(s: &AgentSession) -> Shown {
+    match s.status {
+        SessionStatus::Active | SessionStatus::Stale => Shown::Active,
+        SessionStatus::Done => Shown::Done,
+        SessionStatus::Waiting => {
+            if s.open_tools.iter().any(|t| matches!(t.tool.as_str(), "AskUserQuestion" | "ExitPlanMode")) {
+                Shown::Asking
+            } else {
+                Shown::Permission
+            }
+        }
+    }
+}
+
+impl Observer {
+    pub fn new(providers: Vec<Box<dyn AgentProvider>>, config: ObserverConfig) -> Self {
+        Observer { providers, tracked: HashMap::new(), next_id: 1, config }
+    }
+
+    pub fn config(&self) -> &ObserverConfig {
+        &self.config
+    }
+
+    /// New config; agents the new project filter hides are closed on the next tick.
+    pub fn set_config(&mut self, config: ObserverConfig) {
+        self.config = config;
+    }
+
+    /// Read new lines everywhere and return the messages that bring the office up to date.
+    pub fn tick(&mut self, now_ms: u64) -> Vec<Value> {
+        let mut out = Vec::new();
+        let window = self.config.window_ms;
+
+        // Discover and read.
+        let mut seen: Vec<PathBuf> = Vec::new();
+        for pi in 0..self.providers.len() {
+            let provider = &self.providers[pi];
+            if provider.parser().is_none() {
+                continue;
+            }
+            let files = if self.config.projects.is_empty() {
+                provider.session_files()
+            } else {
+                self.config.projects.iter().flat_map(|p| provider.sessions_for_project(p)).collect()
+            };
+            for file in files {
+                let mtime = modified_ms(&file);
+                if now_ms.saturating_sub(mtime) > window && !self.tracked.contains_key(&file) {
+                    continue;
+                }
+                seen.push(file.clone());
+                let len = std::fs::metadata(&file).map(|m| m.len()).unwrap_or(0);
+                if let Some(t) = self.tracked.get_mut(&file) {
+                    if len < t.offset {
+                        // Rewritten from scratch: start over.
+                        t.offset = 0;
+                    }
+                    if len != t.len || mtime != t.mtime {
+                        if let Ok((lines, end)) = read_lines_from(&file, t.offset) {
+                            lines.iter().for_each(|l| t.parser.feed_line(l));
+                            t.offset = end;
+                        }
+                        t.len = len;
+                        t.mtime = mtime;
+                    }
+                } else {
+                    let Some(mut parser) = provider.parser() else { continue };
+                    let Ok(offset) = read_session_bounded(parser.as_mut(), &file) else { continue };
+                    let agent_id = self.next_id;
+                    self.next_id += 1;
+                    let (palette, hue_shift) = palette_for(agent_id);
+                    self.tracked.insert(file.clone(), Tracked { agent_id, parser, offset, len, mtime, palette, hue_shift, directory: String::new(), tools: Vec::new(), shown: None, context: 0, session: None });
+                }
+            }
+        }
+
+        // Diff each tracked session against what the office shows.
+        let mut gone = Vec::new();
+        for (path, t) in self.tracked.iter_mut() {
+            let s = t.parser.session(path, t.mtime, now_ms, window);
+            let filtered_out = !seen.contains(path);
+            if s.status == SessionStatus::Stale || filtered_out {
+                if t.shown.is_some() {
+                    out.push(json!({ "type": "agentClosed", "id": t.agent_id }));
+                }
+                gone.push(path.clone());
+                continue;
+            }
+            let id = t.agent_id;
+            if t.shown.is_none() {
+                t.directory = Path::new(&s.cwd).file_name().map(|n| n.to_string_lossy().into_owned()).filter(|n| !n.is_empty()).unwrap_or_else(|| s.title.clone());
+                out.push(json!({ "type": "agentCreated", "id": id, "directoryName": t.directory, "isExternal": true, "palette": t.palette, "hueShift": t.hue_shift }));
+                t.shown = Some(Shown::Active);
+            }
+            // Tools.
+            for o in &s.open_tools {
+                if !t.tools.iter().any(|(tid, _, _)| tid == &o.id) {
+                    out.push(json!({ "type": "agentToolStart", "id": id, "toolId": o.id, "status": o.label, "toolName": o.tool }));
+                    t.tools.push((o.id.clone(), o.label.clone(), o.tool.clone()));
+                }
+            }
+            t.tools.retain(|(tid, _, _)| {
+                let open = s.open_tools.iter().any(|o| &o.id == tid);
+                if !open {
+                    out.push(json!({ "type": "agentToolDone", "id": id, "toolId": tid }));
+                }
+                open
+            });
+            // Status.
+            let want = shown_for(&s);
+            let had = t.shown.unwrap_or(Shown::Active);
+            if want != had {
+                if had == Shown::Permission {
+                    out.push(json!({ "type": "agentToolPermissionClear", "id": id }));
+                }
+                match want {
+                    Shown::Active => out.push(json!({ "type": "agentStatus", "id": id, "status": "active" })),
+                    Shown::Done => {
+                        out.push(json!({ "type": "agentToolsClear", "id": id }));
+                        t.tools.clear();
+                        out.push(json!({ "type": "agentStatus", "id": id, "status": "waiting" }));
+                    }
+                    Shown::Asking => out.push(json!({ "type": "agentStatus", "id": id, "status": "waiting", "awaitingInput": true })),
+                    Shown::Permission => out.push(json!({ "type": "agentToolPermission", "id": id })),
+                }
+                t.shown = Some(want);
+            }
+            if s.context_tokens > 0 && s.context_tokens != t.context {
+                out.push(json!({ "type": "agentContextUsage", "id": id, "contextTokens": s.context_tokens, "maxContextTokens": s.max_context_tokens }));
+                t.context = s.context_tokens;
+            }
+            t.session = Some(s);
+        }
+        for p in gone {
+            self.tracked.remove(&p);
+        }
+        out
+    }
+
+    /// Everything a freshly loaded office needs, after its layout: `existingAgents` first, then each
+    /// agent's tools, bubble and context gauge (the order pixel-agents' server uses).
+    pub fn snapshot(&self) -> (Value, Vec<Value>) {
+        let mut shown: Vec<&Tracked> = self.tracked.values().filter(|t| t.shown.is_some()).collect();
+        shown.sort_by_key(|t| t.agent_id);
+        let mut meta = serde_json::Map::new();
+        let mut dirs = serde_json::Map::new();
+        let mut external = serde_json::Map::new();
+        for t in &shown {
+            meta.insert(t.agent_id.to_string(), json!({ "palette": t.palette, "hueShift": t.hue_shift }));
+            dirs.insert(t.agent_id.to_string(), json!(t.directory));
+            external.insert(t.agent_id.to_string(), json!(true));
+        }
+        let existing = json!({ "type": "existingAgents", "agents": shown.iter().map(|t| t.agent_id).collect::<Vec<_>>(), "agentMeta": meta, "directoryNames": dirs, "externalAgents": external });
+        let mut activity = Vec::new();
+        for t in &shown {
+            for (tid, label, tool) in &t.tools {
+                activity.push(json!({ "type": "agentToolStart", "id": t.agent_id, "toolId": tid, "status": label, "toolName": tool }));
+            }
+            match t.shown {
+                Some(Shown::Done) => activity.push(json!({ "type": "agentStatus", "id": t.agent_id, "status": "waiting" })),
+                Some(Shown::Asking) => activity.push(json!({ "type": "agentStatus", "id": t.agent_id, "status": "waiting", "awaitingInput": true })),
+                Some(Shown::Permission) => activity.push(json!({ "type": "agentToolPermission", "id": t.agent_id })),
+                _ => {}
+            }
+            if t.context > 0 {
+                let max = t.session.as_ref().map(|s| s.max_context_tokens).unwrap_or(200_000);
+                activity.push(json!({ "type": "agentContextUsage", "id": t.agent_id, "contextTokens": t.context, "maxContextTokens": max }));
+            }
+        }
+        (existing, activity)
+    }
+
+    /// Sessions in the office, by agent id (the side panel and the agent list).
+    pub fn agents(&self) -> Vec<(u32, AgentSession)> {
+        let mut v: Vec<(u32, AgentSession)> = self.tracked.values().filter(|t| t.shown.is_some()).filter_map(|t| t.session.clone().map(|s| (t.agent_id, s))).collect();
+        v.sort_by_key(|(id, _)| *id);
+        v
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::providers::claude::{fixtures, ClaudeProvider};
+    use serde_json::json;
+    use std::io::Write;
+
+    fn types(msgs: &[Value]) -> Vec<String> {
+        msgs.iter().map(|m| m["type"].as_str().unwrap().to_string()).collect()
+    }
+
+    fn append(path: &Path, line: &str) {
+        let mut f = std::fs::OpenOptions::new().append(true).create(true).open(path).unwrap();
+        writeln!(f, "{line}").unwrap();
+    }
+
+    #[test]
+    fn follows_a_session_through_a_turn() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("D--Game");
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("s1.jsonl");
+        // Timestamps "now": the transcript was just written.
+        let now = modified_ms(tmp.path()).max(1);
+        let at = "2026-11-09T06:00:00.000Z";
+        append(&file, &fixtures::user("Fix it", at));
+        append(&file, &fixtures::tool_use("t1", "Edit", json!({ "file_path": "a.rs" }), at));
+
+        let mut obs = Observer::new(vec![Box::new(ClaudeProvider::new(tmp.path().to_path_buf()))], ObserverConfig { window_ms: u64::MAX / 2, projects: vec![] });
+        let now = now.max(modified_ms(&file));
+        let first = obs.tick(now);
+        assert_eq!(types(&first), ["agentCreated", "agentToolStart", "agentContextUsage"]);
+        assert_eq!(first[0]["directoryName"], "Game");
+        assert_eq!(first[1]["status"], "Editing a.rs");
+        assert!(obs.tick(now).is_empty(), "nothing new, nothing sent");
+
+        append(&file, &fixtures::tool_result("t1", at));
+        append(&file, &fixtures::reply("Fixed.", at));
+        let end = obs.tick(now + 1);
+        assert_eq!(types(&end), ["agentToolDone", "agentToolsClear", "agentStatus"]);
+        assert_eq!(end[2]["status"], "waiting");
+
+        let (existing, activity) = obs.snapshot();
+        assert_eq!(existing["agents"], json!([1]));
+        assert_eq!(types(&activity), ["agentStatus", "agentContextUsage"]);
+        assert_eq!(obs.agents()[0].1.last_reply, "Fixed.");
+
+        append(&file, &fixtures::user("Again", at));
+        assert_eq!(types(&obs.tick(now + 2)), ["agentStatus"], "new prompt → active");
+    }
+
+    #[test]
+    fn closes_stale_and_filtered_sessions() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("D--Game");
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("s1.jsonl");
+        append(&file, &fixtures::user("hi", "2026-11-09T06:00:00Z"));
+        let m = modified_ms(&file);
+        let mut obs = Observer::new(vec![Box::new(ClaudeProvider::new(tmp.path().to_path_buf()))], ObserverConfig { window_ms: 60_000, projects: vec![] });
+        assert_eq!(types(&obs.tick(m + 1_000))[0], "agentCreated");
+        assert_eq!(types(&obs.tick(m + 120_000)), ["agentClosed"]);
+        assert!(obs.agents().is_empty());
+
+        // Project filter that does not match → never created.
+        let mut obs = Observer::new(vec![Box::new(ClaudeProvider::new(tmp.path().to_path_buf()))], ObserverConfig { window_ms: 60_000, projects: vec![PathBuf::from("E:\\Other")] });
+        assert!(obs.tick(m + 1_000).is_empty());
+        obs.set_config(ObserverConfig { window_ms: 60_000, projects: vec![PathBuf::from("D:\\Game")] });
+        assert_eq!(types(&obs.tick(m + 1_000))[0], "agentCreated");
+    }
+
+    #[test]
+    fn palettes_are_diverse() {
+        assert_eq!(palette_for(1), (0, 0));
+        assert_eq!(palette_for(6), (5, 0));
+        assert_eq!(palette_for(7), (0, 45));
+    }
+}
