@@ -4,6 +4,8 @@ All user-visible changes. Newest first; one section per released version.
 
 ## Unreleased
 
+## 0.1.1 — 2026-11-09
+
 - **Help / Hướng dẫn** (`F1`, the **?** button in the header, or `Ctrl+K` → "Help / Hướng dẫn"): an in-app
   usage guide in Vietnamese and English — Getting started (how sessions are found, what is read and written,
   layout, dropping folders, shortcuts, appearance, updates), one topic per tab (Office, Projects, History, Agents)
@@ -25,7 +27,7 @@ All user-visible changes. Newest first; one section per released version.
 - Projects list: the line under each project counts missing items by level ("2 recommended, 1 optional missing").
 - Removed the unused `get_settings` / `set_settings` commands.
 
-## 0.1.0 — 2026-11-09 (signed build ready, not published yet — see docs/PROGRESS.md P5)
+## 0.1.0 — 2026-11-09
 - Pixel office: every Claude Code session (CLI, Desktop app, IDE) active in the last 30 min is a character that types,
   reads and raises a bubble when it needs you; filter by project and time window; layout editor kept from pixel-agents.
 - Agent panel: click a character for its last prompt, what it is doing now, recent actions, last reply and context use.
