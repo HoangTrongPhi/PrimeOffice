@@ -20,8 +20,10 @@
   bridge (asset decode + messages), `observer.rs` → `office://message`, layout saved to app data
 - [x] P3 UI — Projects (checklist with fixes), History (prompt / actions / reply), Agents, agent detail panel; mock
 - [ ] P4 Art — [x] generated crew (8, CC0) [x] docs/ASSETS.md research [ ] generated furniture set [ ] decide on classic chars (Q4)
-- [ ] P5 Release 0.1.0 — needs the user's OK: git init, GitHub repo, `npm run release -- -Version 0.1.0 -Publish`,
-  catalog `available`
+- [ ] P5 Release 0.1.0 — approved by the user 2026-11-09. [x] git init + commit [x] signed build in `release/0.1.0`
+  (installer 3.47 MB, latest.json, .sig, SHA256SUMS) [x] Abyss catalog set to `available` (revision 5, not pushed)
+  [ ] `gh repo create HoangTrongPhi/PrimeOffice --public --source . --push` [ ] `gh release create v0.1.0 release/0.1.0/*`
+  [ ] push Abyss (catalog) — the agent's auto mode blocks creating public repos/releases, so the user runs these
 - [ ] P6 Codex / Gemini sessions (formats to verify on a PC that has them)
 - [ ] P7 Optional Claude hooks via `primeoffice.exe hook` (exact permission bubbles)
 
