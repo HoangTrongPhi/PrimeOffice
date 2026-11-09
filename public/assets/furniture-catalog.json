@@ -1,5 +1,22 @@
 [
   {
+    "id": "ARCADE",
+    "name": "Arcade Cabinet",
+    "label": "Arcade Cabinet",
+    "category": "decor",
+    "file": "ARCADE.png",
+    "furniturePath": "furniture/ARCADE/ARCADE.png",
+    "width": 16,
+    "height": 32,
+    "footprintW": 1,
+    "footprintH": 2,
+    "isDesk": false,
+    "canPlaceOnWalls": false,
+    "canPlaceOnSurfaces": false,
+    "backgroundTiles": 1,
+    "groupId": "ARCADE"
+  },
+  {
     "id": "BIN",
     "name": "Bin",
     "label": "Bin",
@@ -232,6 +249,23 @@
     "groupId": "DOUBLE_BOOKSHELF"
   },
   {
+    "id": "EASEL",
+    "name": "Easel",
+    "label": "Easel",
+    "category": "decor",
+    "file": "EASEL.png",
+    "furniturePath": "furniture/EASEL/EASEL.png",
+    "width": 16,
+    "height": 32,
+    "footprintW": 1,
+    "footprintH": 2,
+    "isDesk": false,
+    "canPlaceOnWalls": false,
+    "canPlaceOnSurfaces": false,
+    "backgroundTiles": 1,
+    "groupId": "EASEL"
+  },
+  {
     "id": "HANGING_PLANT",
     "name": "Hanging Plant",
     "label": "Hanging Plant",
@@ -459,6 +493,23 @@
     "groupId": "POT"
   },
   {
+    "id": "SERVER_RACK",
+    "name": "Server Rack",
+    "label": "Server Rack",
+    "category": "decor",
+    "file": "SERVER_RACK.png",
+    "furniturePath": "furniture/SERVER_RACK/SERVER_RACK.png",
+    "width": 16,
+    "height": 32,
+    "footprintW": 1,
+    "footprintH": 2,
+    "isDesk": false,
+    "canPlaceOnWalls": false,
+    "canPlaceOnSurfaces": false,
+    "backgroundTiles": 1,
+    "groupId": "SERVER_RACK"
+  },
+  {
     "id": "SMALL_PAINTING",
     "name": "Small Painting",
     "label": "Small Painting",
@@ -589,6 +640,23 @@
     "furniturePath": "furniture/SOFA/SOFA_SIDE.png"
   },
   {
+    "id": "SPEAKER",
+    "name": "Studio Speaker",
+    "label": "Studio Speaker",
+    "category": "decor",
+    "file": "SPEAKER.png",
+    "furniturePath": "furniture/SPEAKER/SPEAKER.png",
+    "width": 16,
+    "height": 32,
+    "footprintW": 1,
+    "footprintH": 2,
+    "isDesk": false,
+    "canPlaceOnWalls": false,
+    "canPlaceOnSurfaces": false,
+    "backgroundTiles": 1,
+    "groupId": "SPEAKER"
+  },
+  {
     "id": "TABLE_FRONT",
     "name": "Table",
     "label": "Table",
@@ -604,6 +672,40 @@
     "canPlaceOnSurfaces": false,
     "backgroundTiles": 1,
     "groupId": "TABLE_FRONT"
+  },
+  {
+    "id": "TEST_RIG",
+    "name": "Test Devices",
+    "label": "Test Devices",
+    "category": "decor",
+    "file": "TEST_RIG.png",
+    "furniturePath": "furniture/TEST_RIG/TEST_RIG.png",
+    "width": 16,
+    "height": 32,
+    "footprintW": 1,
+    "footprintH": 2,
+    "isDesk": false,
+    "canPlaceOnWalls": false,
+    "canPlaceOnSurfaces": false,
+    "backgroundTiles": 1,
+    "groupId": "TEST_RIG"
+  },
+  {
+    "id": "WATER_COOLER",
+    "name": "Water Cooler",
+    "label": "Water Cooler",
+    "category": "decor",
+    "file": "WATER_COOLER.png",
+    "furniturePath": "furniture/WATER_COOLER/WATER_COOLER.png",
+    "width": 16,
+    "height": 32,
+    "footprintW": 1,
+    "footprintH": 2,
+    "isDesk": false,
+    "canPlaceOnWalls": false,
+    "canPlaceOnSurfaces": false,
+    "backgroundTiles": 1,
+    "groupId": "WATER_COOLER"
   },
   {
     "id": "WHITEBOARD",

@@ -1,7 +1,8 @@
 # PrimeOffice — Progress
 
 ## Status
-- Current phase: P0–P3 done, P4 started (generated crew), P5 release waits for the user's go-ahead
+- Current phase: 0.1.0 and 0.1.1 released; 0.2.0 (sub-agents, departments, Game studio floor plan) built in
+  `release/0.2.0` on 2026-11-10 — the user commits, pushes and publishes the GitHub release themself
 - Last session: 2026-11-09 — app built from the template: Rust observer + providers + project check + CLI,
   vendored pixel-agents office in an iframe, Projects / History / Agents modules, generated character crew
 - `npm run check`: green (35 Rust tests, typecheck, 19/19 commands mocked); `npm run build` green
@@ -19,7 +20,7 @@
 - [x] P2 Office — vendored pixel-agents UI (`src/office/`, VENDORED.md), `office.html` + `office-shim.js`,
   bridge (asset decode + messages), `observer.rs` → `office://message`, layout saved to app data
 - [x] P3 UI — Projects (checklist with fixes), History (prompt / actions / reply), Agents, agent detail panel; mock
-- [ ] P4 Art — [x] generated crew (8, CC0) [x] docs/ASSETS.md research [ ] generated furniture set [ ] decide on classic chars (Q4)
+- [ ] P4 Art — [x] generated crew (8, CC0) [x] docs/ASSETS.md research [x] generated studio furniture (6, 2026-11-10) [ ] more furniture [ ] decide on classic chars (Q4)
 - [ ] P5 Release 0.1.0 — approved by the user 2026-11-09. [x] git init + commit [x] signed build in `release/0.1.0`
   (installer 3.47 MB, latest.json, .sig, SHA256SUMS) [x] Abyss catalog set to `available` (revision 5, not pushed)
   [ ] `gh repo create HoangTrongPhi/PrimeOffice --public --source . --push` [ ] `gh release create v0.1.0 release/0.1.0/*`
@@ -44,8 +45,22 @@
 
 ## Known issues / next steps
 - CSP needs `frame-src 'self'`, `connect-src 'self'` (asset fetches) and `font-src 'self' data:` — keep them.
-- Sub-agents: sidechain records are skipped; the `Agent`/`Task` tool shows as a "Subtask" label only. pixel-agents'
-  sub-agent characters need `subagents/` transcripts (P6+).
+- Sub-agents (2026-11-09): each `Agent`/`Task` call gets its own character, fed from
+  `<session>/subagents/agent-*.jsonl` + `.meta.json` (`toolUseId` ties it to the call, `agentType` is kept).
+  Messages carry `agentType` (and `runInBackground`). A transcript without its sidecar is skipped until it exists.
+- Departments (2026-11-10): sub-agents walk to a desk in the Area of their department
+  (`departments.ts`, agent type → department, matched on Area labels). "Floor plan…" in the Office tab loads
+  the **Game studio** plan (`scripts/gen-studio-layout.py` → `public/assets/layouts/game-studio.json`, 46×39,
+  13 rooms per the agreed map; main sessions sit at Studio head, which has no Area) or the classic office.
+  Checked in `?mock` (writer → Narrative, ue-gas-specialist → Engine lab); not yet with a real UEHF session.
+- Venues (2026-11-10): two or more director sub-agents at once meet in the meeting room (back to their desks as
+  they finish); an engine MCP call (`mcp__unreal-mcp__call_tool`, unity/godot alike) sends the agent to the single
+  "Editor desk" Area in Engine lab, one at a time, the next caller follows; a full department → stand in the room.
+  Studio furniture drawn by `scripts/gen-furniture.py` (6 pieces, CC0). Layout script checks footprints don't
+  overlap and every seat is reachable. Checked in `?mock` (gate → meeting room; editor hand-over by injected messages).
+- Map tuned (2026-11-10, approved by the user): QA moved under Engine lab, Loc & community under Narrative; row 2
+  taller (46×42) so Engineering has 10 desks (8 + 2 spare); main sessions whose turn is done rest in the Lounge
+  (a question for the user or new work brings them back). Checked in `?mock`.
 - Permission prompts are guessed (a non-long tool quiet for 10 s); exact bubbles need hooks (P7).
 - Long transcripts are read head 256 KB + tail 4 MB for history; prompt counts are then partial.
 - The office's furniture/floor art and classic characters come from pixel-agents (license notes in docs/ASSETS.md).

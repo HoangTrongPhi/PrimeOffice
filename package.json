@@ -1,7 +1,7 @@
 {
   "name": "primeoffice",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "PrimeOffice — Pixel office for your AI coding agents",
   "type": "module",
   "scripts": {
@@ -13,8 +13,9 @@
     "tauri": "tauri",
     "release": "powershell -ExecutionPolicy Bypass -File \"../Abyss/scripts/release.ps1\" -App .",
     "check:mock": "node scripts/check-mock.mjs",
+    "test:ts": "node --test scripts/tests/departments.test.ts",
     "test": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "check": "npm run typecheck && npm run check:mock && npm run test"
+    "check": "npm run typecheck && npm run check:mock && npm run test:ts && npm run test"
   },
   "dependencies": {
     "@abyss/ui": "file:../Abyss/packages/abyss-ui",

@@ -4,6 +4,27 @@ All user-visible changes. Newest first; one section per released version.
 
 ## Unreleased
 
+## 0.2.0 — 2026-11-10
+
+- **Sub-agents in the office**: every `Agent` / `Task` call gets its own character, fed from its own transcript
+  (`<session>/subagents/agent-*.jsonl` + `.meta.json`). It appears beside the session that started it, shows its
+  type and task ("gameplay-programmer · Build the inventory"), works through its own tools and leaves when it is done;
+  background sub-agents stay after the parent's turn ends.
+- **Departments**: a sub-agent walks to a desk in its department's Area, found by the Area's name (case and accents
+  ignored: `Engineering`, `QA`, `Phòng QA`, `Engine lab`, `Unreal lab` …). Covers all agents of Claude Code Game
+  Studios projects (UEHF_Studio, its games, CustomClaudeCodeStudio). An Area named after one agent is its own desk.
+  A full department → the agent stands in the room.
+- **Floor plan… → Game studio**: a 13-room studio (Ban giám đốc, Phòng họp, Release & ops, Design, Studio head,
+  Engineering, Narrative, Art, Audio, Engine lab with an Editor desk, Loc & community, Lounge, QA). **Classic office**
+  brings the starting office back. Loading a floor plan replaces the current layout.
+- **Meeting room**: two or more directors at work at once (a director gate) meet there, then go back to their desks.
+- **Editor desk**: an agent calling the engine editor through MCP (`mcp__unreal-mcp__call_tool`, Unity / Godot alike)
+  sits there, one at a time like Unreal MCP; the next caller takes the desk when it is free.
+- **Lounge**: a session whose turn is done rests on the sofas and comes back to its desk for new work or a question.
+- **Studio furniture** drawn for PrimeOffice (CC0): server rack, easel, studio speaker, arcade cabinet, water cooler,
+  test devices.
+- Help / Hướng dẫn: new section "Studio floor plan and departments".
+
 ## 0.1.1 — 2026-11-09
 
 - **Help / Hướng dẫn** (`F1`, the **?** button in the header, or `Ctrl+K` → "Help / Hướng dẫn"): an in-app

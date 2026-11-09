@@ -217,6 +217,12 @@ export interface Character {
   isSubagent: boolean;
   /** Parent agent ID if this is a sub-agent, null otherwise */
   parentAgentId: number | null;
+  /** PrimeOffice: a sub-agent's type (`gameplay-programmer`), which seats it in its department's Area */
+  agentType?: string;
+  /** PrimeOffice: visiting the meeting room or the editor desk (see departments.ts `Venue`) */
+  visit?: 'meeting' | 'editor' | 'lounge';
+  /** PrimeOffice: the seat it left for the visit (freed meanwhile; taken back if still free) */
+  homeSeatId?: string | null;
   /** Active matrix spawn/despawn effect, or null */
   matrixEffect: 'spawn' | 'despawn' | null;
   /** Timer counting up from 0 to MATRIX_EFFECT_DURATION */

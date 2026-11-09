@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use super::{AgentProvider, AgentSession, OpenTool, ProviderState, ProviderStatus, SessionAction, SessionParser, SessionStatus};
+use super::{AgentProvider, AgentSession, OpenTool, SubAgentFile, ProviderState, ProviderStatus, SessionAction, SessionParser, SessionStatus};
 use crate::core::activity::{clip, describe, one_line};
 
 pub const ID: &str = "claude";
@@ -97,6 +97,9 @@ pub struct ClaudeParser {
     open: Vec<OpenTool>,
     turn_ended: bool,
     last: Last,
+    /// Reads a sub-agent's own transcript (`<session>/subagents/agent-*.jsonl`): its records are
+    /// sidechain records, and only an explicit end of turn ends it (no idle guess).
+    sidechain: bool,
 }
 
 /// Text of a user prompt worth showing, or None for tool results, reminders and command output.
@@ -118,6 +121,11 @@ fn prompt_text(raw: &str) -> Option<String> {
 }
 
 impl ClaudeParser {
+    /// Parser for a sub-agent transcript (see `sidechain`).
+    pub fn sub_agent() -> Self {
+        ClaudeParser { sidechain: true, ..Default::default() }
+    }
+
     fn push_action(&mut self, a: SessionAction) {
         if self.actions.len() == MAX_ACTIONS {
             self.actions.pop_front();
@@ -207,9 +215,13 @@ impl ClaudeParser {
                 Some("tool_use") => {
                     let tool = it.get("name").and_then(Value::as_str).unwrap_or("tool").to_string();
                     let id = it.get("id").and_then(Value::as_str).unwrap_or("").to_string();
-                    let (kind, label) = describe(&tool, it.get("input").unwrap_or(&Value::Null));
+                    let input = it.get("input").unwrap_or(&Value::Null);
+                    let (kind, label) = describe(&tool, input);
                     if !id.is_empty() && !self.open.iter().any(|o| o.id == id) {
-                        self.open.push(OpenTool { id, tool: tool.clone(), label: label.clone() });
+                        let spawn = matches!(tool.as_str(), "Agent" | "Task");
+                        let agent_type = if spawn { Some(input.get("subagent_type").and_then(Value::as_str).filter(|t| !t.is_empty()).unwrap_or("general-purpose").to_string()) } else { None };
+                        let background = spawn && input.get("run_in_background").and_then(Value::as_bool) == Some(true);
+                        self.open.push(OpenTool { id, tool: tool.clone(), label: label.clone(), agent_type, background });
                     }
                     self.push_action(SessionAction { at: at.map(str::to_string), kind, tool, label });
                     used_tool = true;
@@ -249,7 +261,7 @@ impl ClaudeParser {
             let maybe_permission = self.open.iter().all(|o| !LONG_OR_EXEMPT.contains(&o.tool.as_str()));
             return if maybe_permission && quiet > PERMISSION_GUESS_MS { SessionStatus::Waiting } else { SessionStatus::Active };
         }
-        if matches!(self.last, Last::Text | Last::Nothing) && quiet > IDLE_DONE_MS {
+        if !self.sidechain && matches!(self.last, Last::Text | Last::Nothing) && quiet > IDLE_DONE_MS {
             return SessionStatus::Done;
         }
         SessionStatus::Active
@@ -265,7 +277,7 @@ impl SessionParser for ClaudeParser {
                 self.session_id = id.to_string();
             }
         }
-        if rec.get("isSidechain").and_then(Value::as_bool) == Some(true) {
+        if rec.get("isSidechain").and_then(Value::as_bool) == Some(true) && !self.sidechain {
             return; // sub-agent records (older Claude Code wrote them inline)
         }
         let kind = s("type").unwrap_or("");
@@ -402,6 +414,32 @@ impl AgentProvider for ClaudeProvider {
     fn parser(&self) -> Option<Box<dyn SessionParser>> {
         Some(Box::new(ClaudeParser::default()))
     }
+
+    /// `<session>.jsonl` → `<session>/subagents/agent-<id>.jsonl`, each with `agent-<id>.meta.json`
+    /// (`toolUseId`, `agentType`, `description`, `finished`). A transcript without a readable
+    /// sidecar is skipped: it cannot be tied to the call that started it (it is tried again later).
+    fn sub_agents(&self, session: &Path) -> Vec<SubAgentFile> {
+        let dir = session.with_extension("").join("subagents");
+        let Ok(rd) = std::fs::read_dir(&dir) else { return Vec::new() };
+        rd.flatten()
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("jsonl")) && p.file_stem().is_some_and(|n| n.to_string_lossy().starts_with("agent-")))
+            .filter_map(|path| {
+                let meta: Value = serde_json::from_slice(&std::fs::read(path.with_extension("meta.json")).ok()?).ok()?;
+                let s = |k: &str| meta.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+                let tool_use_id = s("toolUseId");
+                if tool_use_id.is_empty() {
+                    return None;
+                }
+                let agent_type = Some(s("agentType")).filter(|t| !t.is_empty()).unwrap_or_else(|| "general-purpose".into());
+                Some(SubAgentFile { tool_use_id, agent_type, description: s("description"), finished: meta.get("finished").and_then(Value::as_bool) == Some(true), path })
+            })
+            .collect()
+    }
+
+    fn sub_parser(&self) -> Option<Box<dyn SessionParser>> {
+        Some(Box::new(ClaudeParser::sub_agent()))
+    }
 }
 
 /// Sample transcript lines for tests (here and in the observer / commands).
@@ -510,6 +548,49 @@ mod tests {
         let p = parse(&[user("Go", T0), tool_use("t", "Edit", json!({}), T0), user("[Request interrupted by user]", T1)]);
         let s = p.session(Path::new("s.jsonl"), 0, 0, u64::MAX);
         assert_eq!((s.status, s.prompt_count), (SessionStatus::Done, 1));
+    }
+
+    #[test]
+    fn notes_sub_agent_spawns() {
+        let p = parse(&[
+            user("Go", T0),
+            tool_use("a", "Agent", json!({ "description": "Review", "subagent_type": "qa-lead", "run_in_background": true }), T0),
+            tool_use("b", "Task", json!({ "description": "Look" }), T0),
+            tool_use("c", "Read", json!({ "file_path": "x" }), T0),
+        ]);
+        let s = p.session(Path::new("s.jsonl"), 0, 0, u64::MAX);
+        let got: Vec<(Option<&str>, bool)> = s.open_tools.iter().map(|o| (o.agent_type.as_deref(), o.background)).collect();
+        assert_eq!(got, [(Some("qa-lead"), true), (Some("general-purpose"), false), (None, false)]);
+    }
+
+    #[test]
+    fn sub_agent_parser_reads_sidechain_and_waits_for_the_end() {
+        let t0 = parse_iso_ms(T0).unwrap();
+        let side = json!({ "type": "assistant", "isSidechain": true, "timestamp": T0, "message": { "content": [{ "type": "text", "text": "Thinking aloud" }] } }).to_string();
+        let mut p = ClaudeParser::sub_agent();
+        p.feed_line(&side);
+        assert_eq!(p.session(Path::new("a.jsonl"), t0, t0 + 60_000, u64::MAX).status, SessionStatus::Active, "no idle guess");
+        p.feed_line(&reply("Done", T1));
+        assert_eq!(p.session(Path::new("a.jsonl"), t0, t0 + 1, u64::MAX).status, SessionStatus::Done);
+    }
+
+    #[test]
+    fn lists_sub_agents_from_their_sidecars() {
+        let home = tempfile::tempdir().unwrap();
+        let subs = home.path().join("D--Game").join("s1").join("subagents");
+        std::fs::create_dir_all(&subs).unwrap();
+        for n in ["agent-a", "agent-b", "agent-c"] {
+            std::fs::write(subs.join(format!("{n}.jsonl")), "").unwrap();
+        }
+        std::fs::write(subs.join("agent-a.meta.json"), json!({ "agentType": "writer", "description": "Lore", "toolUseId": "toolu_1", "finished": true }).to_string()).unwrap();
+        std::fs::write(subs.join("agent-b.meta.json"), json!({ "description": "x", "toolUseId": "toolu_2" }).to_string()).unwrap();
+        // agent-c: no sidecar → skipped.
+        let p = ClaudeProvider::new(home.path().to_path_buf());
+        let mut found = p.sub_agents(&home.path().join("D--Game").join("s1.jsonl"));
+        found.sort_by(|a, b| a.tool_use_id.cmp(&b.tool_use_id));
+        let got: Vec<(&str, &str, bool)> = found.iter().map(|f| (f.tool_use_id.as_str(), f.agent_type.as_str(), f.finished)).collect();
+        assert_eq!(got, [("toolu_1", "writer", true), ("toolu_2", "general-purpose", false)]);
+        assert!(p.sub_agents(&home.path().join("D--Game").join("none.jsonl")).is_empty());
     }
 
     #[test]

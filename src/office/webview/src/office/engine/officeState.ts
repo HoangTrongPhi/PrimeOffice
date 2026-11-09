@@ -25,6 +25,7 @@ import {
   layoutToTileMap,
 } from '../layout/layoutSerializer.js';
 import { findPath, getWalkableTiles, isWalkable } from '../layout/tileMap.js';
+import { areaTiersFor, isDirector, isEditorTool, type Venue, venueAreas } from './departments.js';
 import { getPetCount, getPetName } from '../sprites/petSpriteData.js';
 import { getLoadedCharacterCount } from '../sprites/spriteData.js';
 import type {
@@ -172,6 +173,15 @@ export class OfficeState {
       seat.assigned = false;
     }
 
+    // PrimeOffice: a new layout ends every visit (venue seats may be gone); back to the home seat.
+    for (const ch of this.characters.values()) {
+      if (ch.visit) {
+        ch.seatId = ch.homeSeatId ?? null;
+        ch.visit = undefined;
+        ch.homeSeatId = undefined;
+      }
+    }
+
     // First pass: try to keep characters at their existing seats
     for (const ch of this.characters.values()) {
       if (ch.seatId && this.seats.has(ch.seatId)) {
@@ -195,7 +205,11 @@ export class OfficeState {
     // Second pass: assign remaining characters to free seats
     for (const ch of this.characters.values()) {
       if (ch.seatId) continue;
-      const seatId = this.findFreeSeat(ch.directoryName);
+      // PrimeOffice: sub-agents only take a seat in their department's Area (else they stand by
+      // their parent, as upstream); everyone else seats as upstream.
+      const seatId = ch.isSubagent
+        ? this.findDepartmentSeat(ch.agentType)
+        : this.findFreeSeat(ch.directoryName);
       if (seatId) {
         this.seats.get(seatId)!.assigned = true;
         ch.seatId = seatId;
@@ -403,6 +417,152 @@ export class OfficeState {
     return this.pickFromSeats(freeSeats, electronicsTiles);
   }
 
+  /**
+   * PrimeOffice: a free seat in the Area of a sub-agent's department (see `departments.ts`), or null
+   * when the layout has no such Area or it is full.
+   */
+  findDepartmentSeat(agentType?: string): string | null {
+    const labels = (this.layout.areas ?? []).map((a) => a.label);
+    const tiers = areaTiersFor(agentType, labels, this.areaMappings);
+    if (tiers.length === 0) return null;
+    const electronicsTiles = this.buildElectronicsTileSet();
+    const free: string[] = [];
+    for (const [uid, seat] of this.seats) {
+      if (!seat.assigned) free.push(uid);
+    }
+    for (const tier of tiers) {
+      const wanted = new Set(tier);
+      const pick = this.pickFromSeats(
+        free.filter((uid) => {
+          const zone = this.seatZone(uid);
+          return zone !== null && wanted.has(zone);
+        }),
+        electronicsTiles,
+      );
+      if (pick) return pick;
+    }
+    return null;
+  }
+
+  /** PrimeOffice: a free seat whose tile is in one of `labels`, or null. */
+  private freeSeatIn(labels: string[]): string | null {
+    if (labels.length === 0) return null;
+    const wanted = new Set(labels);
+    const free: string[] = [];
+    for (const [uid, seat] of this.seats) {
+      if (seat.assigned) continue;
+      const zone = this.seatZone(uid);
+      if (zone !== null && wanted.has(zone)) free.push(uid);
+    }
+    return this.pickFromSeats(free, this.buildElectronicsTileSet());
+  }
+
+  /** PrimeOffice: a free walkable tile inside the Areas `labels` (standing room), or null. */
+  private freeTileIn(labels: string[]): { col: number; row: number } | null {
+    const tiles = this.layout.areaTiles;
+    if (!tiles || labels.length === 0) return null;
+    const wanted = new Set(labels);
+    const occupied = new Set<string>();
+    for (const ch of this.characters.values()) occupied.add(`${ch.tileCol},${ch.tileRow}`);
+    const inArea = this.walkableTiles.filter((t) => {
+      const label = tiles[t.row * this.layout.cols + t.col];
+      return label != null && wanted.has(label) && !occupied.has(`${t.col},${t.row}`);
+    });
+    return inArea.length > 0 ? inArea[Math.floor(Math.random() * inArea.length)] : null;
+  }
+
+  /**
+   * PrimeOffice: send a character to a venue seat for a while. Its own seat is freed meanwhile and
+   * remembered as `homeSeatId`. False when the venue has no free seat (it stays where it is).
+   */
+  private startVisit(ch: Character, venue: Venue): boolean {
+    if (ch.visit === venue) return true;
+    const seatId = this.freeSeatIn(venueAreas(venue, (this.layout.areas ?? []).map((a) => a.label)));
+    if (!seatId) return false;
+    const home = ch.visit ? ch.homeSeatId : ch.seatId;
+    if (ch.seatId) {
+      const old = this.seats.get(ch.seatId);
+      if (old) old.assigned = false;
+      ch.seatId = null;
+    }
+    ch.homeSeatId = home ?? null;
+    ch.visit = venue;
+    this.reassignSeat(ch.id, seatId);
+    return true;
+  }
+
+  /** PrimeOffice: end a visit: back to the home seat if still free, else another proper seat. */
+  private endVisit(ch: Character): void {
+    if (!ch.visit) return;
+    const home = ch.homeSeatId;
+    ch.visit = undefined;
+    ch.homeSeatId = undefined;
+    if (ch.seatId) {
+      const cur = this.seats.get(ch.seatId);
+      if (cur) cur.assigned = false;
+      ch.seatId = null;
+    }
+    let target = home && this.seats.get(home) && !this.seats.get(home)!.assigned ? home : null;
+    if (!target) {
+      target = ch.isSubagent ? this.findDepartmentSeat(ch.agentType) : this.findFreeSeat(ch.directoryName);
+    }
+    if (target) {
+      this.reassignSeat(ch.id, target);
+    }
+  }
+
+  /**
+   * PrimeOffice: directors meet. Two or more director sub-agents at work at once (a director gate)
+   * → they take the meeting room's seats; fewer → back to their desks.
+   */
+  private syncMeeting(): void {
+    const directors = [...this.characters.values()].filter(
+      (c) => c.isSubagent && c.matrixEffect !== 'despawn' && isDirector(c.agentType),
+    );
+    const meet = directors.length >= 2;
+    for (const c of directors) {
+      if (meet) this.startVisit(c, 'meeting');
+      else if (c.visit === 'meeting') this.endVisit(c);
+    }
+  }
+
+  /**
+   * PrimeOffice: the editor desk takes one agent at a time. An agent calling the engine editor walks
+   * there when the desk is free and goes back with its next other tool; the next caller then follows.
+   */
+  private syncEditor(ch: Character): void {
+    if (isEditorTool(ch.currentTool)) {
+      if (ch.visit !== 'editor') this.startVisit(ch, 'editor');
+      return;
+    }
+    if (ch.visit !== 'editor') return; // a turn end (tool null) leaves the desk too
+    this.endVisit(ch);
+    this.editorNext();
+  }
+
+  /**
+   * PrimeOffice: a main session whose turn is done rests in the lounge; a question for the user (or new
+   * work) brings it back to its desk. Sub-agents never rest: they leave when done.
+   */
+  setAgentResting(id: number, resting: boolean): void {
+    const ch = this.characters.get(id);
+    if (!ch || ch.isSubagent) return;
+    if (resting) {
+      if (!ch.visit) this.startVisit(ch, 'lounge');
+    } else if (ch.visit === 'lounge') {
+      this.endVisit(ch);
+    }
+  }
+
+  /** PrimeOffice: the desk just freed up: the first agent still waiting on the editor takes it. */
+  private editorNext(): void {
+    for (const c of this.characters.values()) {
+      if (c.visit !== 'editor' && c.matrixEffect !== 'despawn' && isEditorTool(c.currentTool)) {
+        if (this.startVisit(c, 'editor')) return;
+      }
+    }
+  }
+
   /** Closest walkable tile to (col,row) not occupied by another character, or null. */
   private closestFreeWalkableTile(col: number, row: number): { col: number; row: number } | null {
     const occupied = new Set<string>();
@@ -600,6 +760,7 @@ export class OfficeState {
     // Start despawn animation instead of immediate delete
     startMatrixEffect(ch, 'despawn');
     ch.bubbleType = null;
+    if (ch.visit === 'editor') this.editorNext(); // PrimeOffice
   }
 
   /** Find seat uid at a given tile position, or null */
@@ -723,7 +884,7 @@ export class OfficeState {
   }
 
   /** Create a sub-agent character with the parent's palette. Returns the sub-agent ID. */
-  addSubagent(parentAgentId: number, parentToolId: string): number {
+  addSubagent(parentAgentId: number, parentToolId: string, agentType?: string): number {
     const key = `${parentAgentId}:${parentToolId}`;
     if (this.subagentIdMap.has(key)) return this.subagentIdMap.get(key)!;
 
@@ -751,6 +912,20 @@ export class OfficeState {
     ch.parentAgentId = parentAgentId;
     startMatrixEffect(ch, 'spawn');
     this.characters.set(id, ch);
+    // PrimeOffice: appear beside the parent, then walk to a desk in the department's Area.
+    if (agentType) ch.agentType = agentType;
+    const deskId = this.findDepartmentSeat(agentType);
+    if (deskId) {
+      this.seats.get(deskId)!.assigned = true;
+      ch.seatId = deskId;
+      this.sendToSeat(id);
+    } else {
+      // Department full (parallel sub-agents of one type): stand in the room instead of by the parent.
+      const tiers = areaTiersFor(agentType, (this.layout.areas ?? []).map((a) => a.label), this.areaMappings);
+      const spot = tiers.length > 0 ? this.freeTileIn(tiers[tiers.length - 1]) : null;
+      if (spot) this.walkToTile(id, spot.col, spot.row);
+    }
+    this.syncMeeting();
 
     this.subagentIdMap.set(key, id);
     this.subagentMeta.set(id, { parentAgentId, parentToolId });
@@ -784,6 +959,9 @@ export class OfficeState {
     this.subagentMeta.delete(id);
     if (this.selectedAgentId === id) this.selectedAgentId = null;
     if (this.cameraFollowId === id) this.cameraFollowId = null;
+    // PrimeOffice: the meeting may end, the editor desk may be free.
+    this.syncMeeting();
+    if (ch?.visit === 'editor') this.editorNext();
   }
 
   /** Remove all sub-agents belonging to a parent agent */
@@ -828,6 +1006,8 @@ export class OfficeState {
     const ch = this.characters.get(id);
     if (ch) {
       ch.isActive = active;
+      // PrimeOffice: back from the lounge to work.
+      if (active && ch.visit === 'lounge') this.endVisit(ch);
       if (!active) {
         // Sentinel -1: signals turn just ended, skip next seat rest timer.
         // Prevents the WALK handler from setting a 2-4 min rest on arrival.
@@ -911,6 +1091,7 @@ export class OfficeState {
     const ch = this.characters.get(id);
     if (ch) {
       ch.currentTool = tool;
+      this.syncEditor(ch);
     }
   }
 
@@ -1190,7 +1371,9 @@ export class OfficeState {
     const seats: Record<number, { palette: number; hueShift: number; seatId: string | null }> = {};
     for (const ch of this.characters.values()) {
       if (ch.isSubagent) continue;
-      seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId: ch.seatId };
+      // PrimeOffice: while visiting, the seat to remember is the home seat.
+      const seatId = ch.visit ? (ch.homeSeatId ?? null) : ch.seatId;
+      seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId };
     }
     return seats;
   }

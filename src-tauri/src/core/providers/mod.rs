@@ -35,6 +35,12 @@ pub struct OpenTool {
     pub id: String,
     pub tool: String,
     pub label: String,
+    /// `Agent`/`Task` calls: the sub-agent type asked for (`subagent_type`, e.g. `gameplay-programmer`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_type: Option<String>,
+    /// `Agent`/`Task` calls started with `run_in_background`: the sub-agent outlives the tool call.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub background: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -117,6 +123,26 @@ pub trait AgentProvider: Send + Sync {
     fn sessions_for_project(&self, dir: &Path) -> Vec<PathBuf>;
     /// None for providers that cannot be read yet.
     fn parser(&self) -> Option<Box<dyn SessionParser>>;
+    /// Sub-agents a session started, each with its own transcript. Default: none.
+    fn sub_agents(&self, _session: &Path) -> Vec<SubAgentFile> {
+        Vec::new()
+    }
+    /// Parser for a sub-agent transcript from `sub_agents`.
+    fn sub_parser(&self) -> Option<Box<dyn SessionParser>> {
+        None
+    }
+}
+
+/// A sub-agent's transcript and what its sidecar says about it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubAgentFile {
+    pub path: PathBuf,
+    /// The parent's `Agent`/`Task` tool call that started it.
+    pub tool_use_id: String,
+    pub agent_type: String,
+    pub description: String,
+    /// The sidecar says it ended.
+    pub finished: bool,
 }
 
 /// The user's home folder (`USERPROFILE` on Windows).

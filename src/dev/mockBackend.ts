@@ -163,6 +163,16 @@ function savePrefs(p: MockOfficePrefs) {
 }
 let prefs = loadPrefs();
 
+/** The layout saved by the office (layout.json in the real backend); null = the bundled default. */
+const LAYOUT_KEY = "primeoffice.mock-layout";
+function mockLayout(): unknown {
+  try {
+    return JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "null");
+  } catch {
+    return null;
+  }
+}
+
 /** Agents closed with ×: hidden until they work again (only agent 1 works in the mock). */
 const hidden = new Set<number>();
 const DIRS: Record<number, string> = { 1: "StarHarbor", 2: "StarHarbor", 3: "BuildTools" };
@@ -201,6 +211,57 @@ function startOfficeLoop() {
     SESSIONS[0].lastActivityAt = new Date().toISOString();
     void emit("office://message", msgs);
   }, 3500);
+  // Agent 2 starts a background sub-agent now and then (like a studio's `/dev-story`): it gets its
+  // own character, works through a few tools from its own transcript, then leaves.
+  // Step 1 of an engine specialist is an Unreal MCP call: it walks to the editor desk, then back.
+  const subSteps: [string, string][] = [["Reading Inventory.h", "Read"], ["Editing Inventory.cpp", "Edit"], ["Running: build", "Bash"]];
+  const editorStep: [string, string] = ["Using call_tool", "mcp__unreal-mcp__call_tool"];
+  const types = ["gameplay-programmer", "qa-tester", "writer", "ue-gas-specialist", "sound-designer", "producer"];
+  let spawn = 0;
+  let step = -1;
+  setInterval(() => {
+    if (hidden.has(2)) return;
+    const parentToolId = `t-spawn-${spawn}`;
+    const msgs: OfficeMessage[] = [];
+    if (step === -1) {
+      msgs.push({ type: "agentToolStart", id: 2, toolId: parentToolId, status: "Subtask: Build the inventory", toolName: "Agent", agentType: types[spawn % types.length], runInBackground: true });
+      msgs.push({ type: "agentToolDone", id: 2, toolId: parentToolId });
+    } else if (step < subSteps.length) {
+      if (step > 0) msgs.push({ type: "subagentToolDone", id: 2, parentToolId, toolId: `s${step - 1}` });
+      const agentType = types[spawn % types.length];
+      const [status, toolName] = step === 1 && agentType.startsWith("ue-") ? editorStep : subSteps[step];
+      msgs.push({ type: "subagentToolStart", id: 2, parentToolId, toolId: `s${step}`, status, toolName, agentType });
+    } else {
+      msgs.push({ type: "subagentClear", id: 2, parentToolId });
+      spawn++;
+      step = -2;
+    }
+    step++;
+    void emit("office://message", msgs);
+  }, 4000);
+
+  // Agent 3 runs a director gate now and then: three directors at once meet in the meeting room,
+  // then go back to their desks as they finish one by one.
+  const directors = ["creative-director", "technical-director", "producer"];
+  let gate = 0;
+  let phase = 0;
+  setInterval(() => {
+    if (hidden.has(3)) return;
+    const msgs: OfficeMessage[] = [];
+    const tid = (d: string) => `t-gate-${gate}-${d}`;
+    if (phase === 0) {
+      for (const d of directors) {
+        msgs.push({ type: "agentToolStart", id: 3, toolId: tid(d), status: "Subtask: Gate check", toolName: "Agent", agentType: d, runInBackground: true });
+        msgs.push({ type: "agentToolDone", id: 3, toolId: tid(d) });
+        msgs.push({ type: "subagentToolStart", id: 3, parentToolId: tid(d), toolId: `${tid(d)}-r`, status: "Reading game-brief.md", toolName: "Read", agentType: d });
+      }
+    } else if (phase <= directors.length) {
+      msgs.push({ type: "subagentClear", id: 3, parentToolId: tid(directors[phase - 1]) });
+    }
+    phase = phase >= directors.length + 2 ? 0 : phase + 1;
+    if (phase === 0) gate++;
+    void emit("office://message", msgs);
+  }, 7000);
 }
 
 if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
@@ -249,7 +310,7 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
             settings: { type: "settingsLoaded", soundEnabled: prefs.soundEnabled, lastSeenVersion: "0.1", extensionVersion: "0.1.0", watchAllSessions: true, alwaysShowLabels: prefs.alwaysShowLabels, ghostHeadlessAgents: false, hooksEnabled: false, hooksInfoShown: true, externalAssetDirectories: [], showAreas: prefs.showAreas, bypassPermissions: false, showHostDirectories: false },
             areaMappings: { type: "areaMappingsLoaded", mappings: prefs.areaMappings },
             existing: { type: "existingAgents", agents: shown, agentMeta: byId(meta), directoryNames: byId((id) => DIRS[id]), externalAgents: byId(() => true) },
-            layout: null,
+            layout: mockLayout(),
             activity: activity.filter((m) => !hidden.has(m.id as number)),
           };
         }
@@ -257,6 +318,11 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
           const m = (a.message ?? {}) as OfficeMessage;
           switch (m.type) {
             case "saveLayout":
+              try {
+                localStorage.setItem(LAYOUT_KEY, JSON.stringify(m.layout));
+              } catch {
+                // not kept; fine for the mock
+              }
               await log("info", "office", "Layout saved");
               return null;
             case "closeAgent": {

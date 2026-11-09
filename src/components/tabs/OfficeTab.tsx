@@ -1,8 +1,10 @@
-import { EmptyState, PillBadge } from "@abyss/ui";
-import { Building2, ChevronRight, FolderOpen, Users, X } from "lucide-react";
+import { EmptyState, Modal, PillBadge } from "@abyss/ui";
+import { Building2, ChevronRight, FolderOpen, LayoutGrid, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { handleHelpKey } from "../../hooks/useGlobalHotkeys";
 import { pickPaths } from "../../lib/dialogs";
+import { inTauri, ipc } from "../../lib/ipc";
+import { errorText, uiLog } from "../../stores/appStore";
 import { connectOfficeFrame } from "../../office/bridge/officeBridge";
 import { useOfficeStore, useProjectStore } from "../../stores/dataStore";
 import { folderName, relTime, SessionView, StatusPill } from "../session/SessionView";
@@ -12,6 +14,26 @@ export const CHARACTER_PACKS: { id: string; label: string }[] = [
   { id: "pixel", label: "PrimeOffice crew" },
   { id: "classic", label: "Classic (pixel-agents)" },
 ];
+
+/** Floor plans that replace the office layout (public/assets). */
+export const FLOOR_PLANS: { id: string; label: string; file: string; text: string }[] = [
+  {
+    id: "studio",
+    label: "Game studio",
+    file: "layouts/game-studio.json",
+    text: "Directors, meeting room, Release & ops, Design, Studio head, Engineering, Narrative, Art, Audio, Engine lab, Loc & community, Lounge, QA. Sub-agents of a Claude Code Game Studios project (UEHF) take a desk in their department; main sessions sit at Studio head and rest in the Lounge when their turn is done.",
+  },
+  { id: "classic", label: "Classic office", file: "default-layout-1.json", text: "The small two-room office PrimeOffice starts with." },
+];
+
+/** Replace the saved office layout with a floor plan. */
+async function loadFloorPlan(file: string) {
+  const layout = await fetch(`${import.meta.env.BASE_URL}assets/${file}`).then((r) => {
+    if (!r.ok) throw new Error(`${file}: ${r.status}`);
+    return r.json() as Promise<unknown>;
+  });
+  if (inTauri) await ipc.officeSend({ type: "saveLayout", layout });
+}
 
 /** Office documents that already pass F1 on (each reload of the frame is a new document). */
 const helpKeyDocs = new WeakSet<Document>();
@@ -40,6 +62,7 @@ export function OfficeTab() {
   const projects = useProjectStore((s) => s.projects);
   const [frameKey, setFrameKey] = useState(0);
   const [listOpen, setListOpen] = useState(true);
+  const [floorOpen, setFloorOpen] = useState(false);
 
   useEffect(() => {
     void useProjectStore.getState().load();
@@ -122,6 +145,9 @@ export function OfficeTab() {
             ))}
           </select>
         </label>
+        <button type="button" className="btn" onClick={() => setFloorOpen(true)} title="Floor plan: load the game studio (departments) or the classic office">
+          <LayoutGrid className="size-3.5" /> Floor plan…
+        </button>
         <div className="flex-1" />
         <PillBadge tone={agents.length ? "accent" : "neutral"}>
           <Users className="size-3" /> {agents.length} agent{agents.length === 1 ? "" : "s"}
@@ -130,6 +156,35 @@ export function OfficeTab() {
           <ChevronRight className={`size-3.5 transition-transform ${listOpen ? "" : "rotate-180"}`} />
         </button>
       </div>
+
+      <Modal open={floorOpen} title="Floor plan" onClose={() => setFloorOpen(false)}>
+        <div className="flex flex-col gap-3 p-4 text-[12.5px] text-ink-muted">
+          <p>Loading a floor plan replaces the current office layout (furniture, floors, areas). Edit it afterwards with the office's Layout button.</p>
+          {FLOOR_PLANS.map((f) => (
+            <div key={f.id} className="flex items-start gap-3 rounded-lg border border-edge p-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium text-ink">{f.label}</div>
+                <div className="mt-0.5">{f.text}</div>
+              </div>
+              <button
+                type="button"
+                className={f.id === "studio" ? "btn btn-primary" : "btn"}
+                onClick={() => {
+                  setFloorOpen(false);
+                  loadFloorPlan(f.file)
+                    .then(() => {
+                      uiLog("info", `Office floor plan: ${f.label}`);
+                      setFrameKey((k) => k + 1);
+                    })
+                    .catch((e) => uiLog("error", `Cannot load the floor plan: ${errorText(e)}`));
+                }}
+              >
+                Load
+              </button>
+            </div>
+          ))}
+        </div>
+      </Modal>
 
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1 bg-[#1e1e2e]">

@@ -45,6 +45,10 @@ export interface OpenTool {
   id: string;
   tool: string;
   label: string;
+  /** `Agent`/`Task` calls: the sub-agent type asked for (e.g. `gameplay-programmer`). */
+  agentType?: string;
+  /** `Agent`/`Task` calls started in the background. */
+  background?: boolean;
 }
 
 export type SessionStatus = "active" | "waiting" | "done" | "stale";

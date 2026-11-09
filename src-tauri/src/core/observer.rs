@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use super::providers::{modified_ms, read_lines_from, read_session_bounded, AgentProvider, AgentSession, SessionParser, SessionStatus};
+use super::providers::{modified_ms, read_lines_from, read_session_bounded, AgentProvider, AgentSession, OpenTool, SessionParser, SessionStatus};
 
 /// What the office shows for an agent; changes between ticks become messages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,8 +22,27 @@ enum Shown {
     Permission,
 }
 
+/// A sub-agent of a tracked session, read from its own transcript.
+struct Sub {
+    /// The parent's `Agent`/`Task` tool call (pixel-agents' `parentToolId`).
+    parent_tool_id: String,
+    agent_type: String,
+    parser: Box<dyn SessionParser>,
+    offset: u64,
+    len: u64,
+    mtime: u64,
+    /// Open tools sent as `subagentToolStart`: (tool id, label, tool).
+    tools: Vec<(String, String, String)>,
+    /// The office has (or may have) its character: a `subagentClear` is owed when it ends.
+    shown: bool,
+    /// Ended for good (sidecar says so, or stale): no more reading.
+    finished: bool,
+}
+
 struct Tracked {
     agent_id: u32,
+    /// Index into `Observer::providers`.
+    provider: usize,
     parser: Box<dyn SessionParser>,
     offset: u64,
     len: u64,
@@ -37,6 +56,8 @@ struct Tracked {
     session: Option<AgentSession>,
     /// Closed with the office's × (`closeAgent`): hidden until the transcript grows again.
     dismissed: bool,
+    /// Sub-agents by transcript path.
+    subs: HashMap<PathBuf, Sub>,
 }
 
 /// Where an agent sits and how it looks (pixel-agents' `SeatAssignment`), remembered per transcript
@@ -76,6 +97,84 @@ pub struct Observer {
 fn palette_for(id: u32) -> (u32, u32) {
     let n = id.saturating_sub(1);
     (n % 6, if n < 6 { 0 } else { 45 * (1 + (n / 6 - 1) % 7) })
+}
+
+/// `agentToolStart` for a parent tool; `Agent`/`Task` calls carry the sub-agent type and whether
+/// it runs in the background (the office keeps a background sub-agent past the parent's turn).
+fn tool_start(id: u32, o: &OpenTool) -> Value {
+    let mut m = json!({ "type": "agentToolStart", "id": id, "toolId": o.id, "status": o.label, "toolName": o.tool });
+    if let Some(t) = &o.agent_type {
+        m["agentType"] = json!(t);
+    }
+    if o.background {
+        m["runInBackground"] = json!(true);
+    }
+    m
+}
+
+fn sub_tool_start(id: u32, sub: &Sub, tool_id: &str, label: &str, tool: &str) -> Value {
+    json!({ "type": "subagentToolStart", "id": id, "parentToolId": sub.parent_tool_id, "toolId": tool_id, "status": label, "toolName": tool, "agentType": sub.agent_type })
+}
+
+/// Read what is new in `t`'s sub-agents and send their tools; `subagentClear` when one ends.
+fn sync_subs(provider: &dyn AgentProvider, path: &Path, t: &mut Tracked, now_ms: u64, window: u64, out: &mut Vec<Value>) {
+    let id = t.agent_id;
+    for f in provider.sub_agents(path) {
+        let mtime = modified_ms(&f.path);
+        let len = std::fs::metadata(&f.path).map(|m| m.len()).unwrap_or(0);
+        if let Some(sub) = t.subs.get_mut(&f.path) {
+            if sub.finished {
+                continue;
+            }
+            if len < sub.offset {
+                sub.offset = 0;
+            }
+            if len != sub.len || mtime != sub.mtime {
+                if let Ok((lines, end)) = read_lines_from(&f.path, sub.offset) {
+                    lines.iter().for_each(|l| sub.parser.feed_line(l));
+                    sub.offset = end;
+                }
+                sub.len = len;
+                sub.mtime = mtime;
+            }
+        } else {
+            // Old sub-agents that ended before the office saw them are noted, never shown.
+            let old = f.finished || now_ms.saturating_sub(mtime) > window;
+            let Some(mut parser) = provider.sub_parser() else { return };
+            let offset = if old { len } else { read_session_bounded(parser.as_mut(), &f.path).unwrap_or(len) };
+            t.subs.insert(f.path.clone(), Sub { parent_tool_id: f.tool_use_id.clone(), agent_type: f.agent_type.clone(), parser, offset, len, mtime, tools: Vec::new(), shown: !old, finished: old });
+            if old {
+                continue;
+            }
+        }
+        let Some(sub) = t.subs.get_mut(&f.path) else { continue };
+        let s = sub.parser.session(&f.path, sub.mtime, now_ms, window);
+        let over = f.finished || matches!(s.status, SessionStatus::Done | SessionStatus::Stale);
+        if over {
+            if sub.shown {
+                out.push(json!({ "type": "subagentClear", "id": id, "parentToolId": sub.parent_tool_id }));
+            }
+            sub.shown = false;
+            sub.tools.clear();
+            sub.finished = f.finished || s.status == SessionStatus::Stale;
+            continue;
+        }
+        for o in &s.open_tools {
+            if !sub.tools.iter().any(|(tid, _, _)| tid == &o.id) {
+                out.push(sub_tool_start(id, sub, &o.id, &o.label, &o.tool));
+                sub.tools.push((o.id.clone(), o.label.clone(), o.tool.clone()));
+                sub.shown = true;
+            }
+        }
+        let parent = sub.parent_tool_id.clone();
+        sub.tools.retain(|(tid, _, _)| {
+            let open = s.open_tools.iter().any(|o| &o.id == tid);
+            if !open {
+                out.push(json!({ "type": "subagentToolDone", "id": id, "parentToolId": parent, "toolId": tid }));
+            }
+            open
+        });
+    }
 }
 
 fn shown_for(s: &AgentSession) -> Shown {
@@ -191,7 +290,7 @@ impl Observer {
                     let agent_id = self.next_id;
                     self.next_id += 1;
                     let (palette, hue_shift) = self.seats.get(&file).map(|s| (s.palette, s.hue_shift)).unwrap_or_else(|| palette_for(agent_id));
-                    self.tracked.insert(file.clone(), Tracked { agent_id, parser, offset, len, mtime, palette, hue_shift, directory: String::new(), tools: Vec::new(), shown: None, context: 0, session: None, dismissed: false });
+                    self.tracked.insert(file.clone(), Tracked { agent_id, provider: pi, subs: HashMap::new(), parser, offset, len, mtime, palette, hue_shift, directory: String::new(), tools: Vec::new(), shown: None, context: 0, session: None, dismissed: false });
                 }
             }
         }
@@ -215,6 +314,7 @@ impl Observer {
                 }
                 // Sent again in full when it comes back.
                 t.tools.clear();
+                t.subs.clear();
                 t.context = 0;
                 continue;
             }
@@ -230,7 +330,7 @@ impl Observer {
             // Tools.
             for o in &s.open_tools {
                 if !t.tools.iter().any(|(tid, _, _)| tid == &o.id) {
-                    out.push(json!({ "type": "agentToolStart", "id": id, "toolId": o.id, "status": o.label, "toolName": o.tool }));
+                    out.push(tool_start(id, o));
                     t.tools.push((o.id.clone(), o.label.clone(), o.tool.clone()));
                 }
             }
@@ -260,6 +360,8 @@ impl Observer {
                 }
                 t.shown = Some(want);
             }
+            // Sub-agents, after the parent's tools (its `Agent` call creates their characters).
+            sync_subs(self.providers[t.provider].as_ref(), path, t, now_ms, window, &mut out);
             if s.context_tokens > 0 && s.context_tokens != t.context {
                 out.push(json!({ "type": "agentContextUsage", "id": id, "contextTokens": s.context_tokens, "maxContextTokens": s.max_context_tokens }));
                 t.context = s.context_tokens;
@@ -293,7 +395,17 @@ impl Observer {
         let mut activity = Vec::new();
         for (_, t) in &shown {
             for (tid, label, tool) in &t.tools {
-                activity.push(json!({ "type": "agentToolStart", "id": t.agent_id, "toolId": tid, "status": label, "toolName": tool }));
+                match t.session.as_ref().and_then(|s| s.open_tools.iter().find(|o| &o.id == tid)) {
+                    Some(o) => activity.push(tool_start(t.agent_id, o)),
+                    None => activity.push(json!({ "type": "agentToolStart", "id": t.agent_id, "toolId": tid, "status": label, "toolName": tool })),
+                }
+            }
+            let mut subs: Vec<&Sub> = t.subs.values().filter(|s| s.shown && !s.tools.is_empty()).collect();
+            subs.sort_by(|a, b| a.parent_tool_id.cmp(&b.parent_tool_id));
+            for sub in subs {
+                for (tid, label, tool) in &sub.tools {
+                    activity.push(sub_tool_start(t.agent_id, sub, tid, label, tool));
+                }
             }
             match t.shown {
                 Some(Shown::Done) => activity.push(json!({ "type": "agentStatus", "id": t.agent_id, "status": "waiting" })),
@@ -438,6 +550,64 @@ mod tests {
         next.set_seats(obs.seats().clone());
         let created = next.tick(now);
         assert_eq!((created[0]["seatId"].as_str(), created[0]["palette"].as_u64(), created[0]["hueShift"].as_u64()), (Some("desk-7"), Some(4), Some(90)));
+    }
+
+    fn write_meta(sub_dir: &Path, name: &str, tool_use_id: &str, agent_type: &str, finished: bool) {
+        let meta = json!({ "agentType": agent_type, "description": "Build the inventory", "toolUseId": tool_use_id, "finished": finished });
+        std::fs::write(sub_dir.join(format!("{name}.meta.json")), meta.to_string()).unwrap();
+    }
+
+    #[test]
+    fn sub_agents_get_their_own_tools_and_leave_when_done() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("D--Game");
+        let subs = dir.join("s1").join("subagents");
+        std::fs::create_dir_all(&subs).unwrap();
+        let file = dir.join("s1.jsonl");
+        let at = "2026-11-09T06:00:00.000Z";
+        append(&file, &fixtures::user("/dev-story", at));
+        append(&file, &fixtures::tool_use("toolu_spawn", "Agent", json!({ "description": "Build the inventory", "subagent_type": "gameplay-programmer", "run_in_background": true }), at));
+        // An older sub-agent of the same session, already finished: never shown.
+        write_meta(&subs, "agent-old", "toolu_old", "qa-tester", true);
+        append(&subs.join("agent-old.jsonl"), &fixtures::tool_use("o1", "Read", json!({ "file_path": "x.md" }), at));
+        // The live one, without its sidecar yet: skipped until the sidecar exists.
+        let sub = subs.join("agent-a1.jsonl");
+        append(&sub, &fixtures::user("Implement the inventory story", at));
+        append(&sub, &fixtures::tool_use("s1", "Edit", json!({ "file_path": "Inventory.cpp" }), at));
+
+        let mut obs = Observer::new(vec![Box::new(ClaudeProvider::new(tmp.path().to_path_buf()))], ObserverConfig { window_ms: u64::MAX / 2, projects: vec![] });
+        let now = modified_ms(&sub).max(modified_ms(&file));
+        let first = obs.tick(now);
+        assert_eq!(types(&first), ["agentCreated", "agentToolStart", "agentContextUsage"]);
+        assert_eq!((first[1]["agentType"].as_str(), first[1]["runInBackground"].as_bool()), (Some("gameplay-programmer"), Some(true)));
+
+        write_meta(&subs, "agent-a1", "toolu_spawn", "gameplay-programmer", false);
+        let next = obs.tick(now);
+        assert_eq!(types(&next), ["subagentToolStart"]);
+        assert_eq!((next[0]["parentToolId"].as_str(), next[0]["status"].as_str(), next[0]["agentType"].as_str()), (Some("toolu_spawn"), Some("Editing Inventory.cpp"), Some("gameplay-programmer")));
+        assert!(obs.tick(now).is_empty(), "nothing new, nothing sent");
+
+        // A reloaded office gets the sub-agent back with its tool.
+        let (_, activity) = obs.snapshot();
+        assert_eq!(types(&activity), ["agentToolStart", "subagentToolStart", "agentContextUsage"]);
+
+        append(&sub, &fixtures::tool_result("s1", at));
+        append(&sub, &fixtures::tool_use("s2", "Bash", json!({ "command": "build" }), at));
+        assert_eq!(types(&obs.tick(now + 1)), ["subagentToolStart", "subagentToolDone"]);
+
+        // The parent's background call returns at once; the sub-agent keeps working.
+        append(&file, &fixtures::tool_result("toolu_spawn", at));
+        append(&file, &fixtures::reply("Started.", at));
+        assert_eq!(types(&obs.tick(now + 2)), ["agentToolDone", "agentToolsClear", "agentStatus"]);
+
+        append(&sub, &fixtures::tool_result("s2", at));
+        append(&sub, &fixtures::reply("Inventory done.", at));
+        let end = obs.tick(now + 3);
+        assert_eq!(types(&end), ["subagentClear"]);
+        assert_eq!(end[0]["parentToolId"], "toolu_spawn");
+        write_meta(&subs, "agent-a1", "toolu_spawn", "gameplay-programmer", true);
+        assert!(obs.tick(now + 4).is_empty(), "cleared once");
+        assert_eq!(types(&obs.snapshot().1), ["agentStatus", "agentContextUsage"]);
     }
 
     #[test]

@@ -4,6 +4,7 @@ import type { HooksConsentRequest } from '../../../core/src/messages.js';
 import { playDoneSound, playPermissionSound, setSoundEnabled } from '../notificationSound.js';
 import type { ExistingAgentMeta, PendingAgent } from '../office/engine/existingAgents.js';
 import { reconcileExistingAgents } from '../office/engine/existingAgents.js';
+import { subagentLabel } from '../office/engine/departments.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { setGhostHeadlessAgents as setRendererGhostHeadlessAgents } from '../office/engine/renderer.js';
 import { setFloorSprites } from '../office/floorTiles.js';
@@ -491,8 +492,11 @@ export function useExtensionMessages(
           !isTeammateSpawn &&
           (!runInBackground || !parentHasTeam)
         ) {
-          const label = status.startsWith('Subtask:') ? status.slice('Subtask:'.length).trim() : '';
-          const subId = os.addSubagent(id, toolId);
+          // PrimeOffice: label = sub-agent type + task; the type seats it in its department.
+          const desc = status.startsWith('Subtask:') ? status.slice('Subtask:'.length).trim() : '';
+          const agentType = msg.agentType as string | undefined;
+          const label = subagentLabel(agentType, desc);
+          const subId = os.addSubagent(id, toolId, agentType);
           setSubagentCharacters((prev) => {
             if (prev.some((s) => s.id === subId)) return prev;
             return [...prev, { id: subId, parentAgentId: id, parentToolId: toolId, label }];
@@ -571,6 +575,8 @@ export function useExtensionMessages(
           return { ...prev, [id]: awaiting };
         });
         os.setAgentActive(id, status === 'active');
+        // PrimeOffice: turn done → the lounge; a question for the user → back at the desk.
+        os.setAgentResting(id, status === 'waiting' && msg.awaitingInput !== true);
         if (status === 'waiting') {
           os.showWaitingBubble(id, msg.awaitingInput === true);
           playDoneSound();
@@ -635,18 +641,21 @@ export function useExtensionMessages(
         // panel that lost it — create it lazily; addSubagent is idempotent.
         let subId = os.getSubagentId(id, parentToolId);
         if (subId === null) {
-          subId = os.addSubagent(id, parentToolId);
+          const agentType = msg.agentType as string | undefined;
+          subId = os.addSubagent(id, parentToolId, agentType);
           const newSubId = subId;
           setSubagentCharacters((prev) => {
             if (prev.some((s) => s.id === newSubId)) return prev;
-            return [...prev, { id: newSubId, parentAgentId: id, parentToolId, label: '' }];
+            const label = subagentLabel(agentType, '');
+            return [...prev, { id: newSubId, parentAgentId: id, parentToolId, label }];
           });
           // Only watched background spawns are created lazily -- mark the
           // parent tool as background so agentToolsClear preserves the sub.
           const set = (backgroundParentToolIdsRef.current[id] ??= new Set());
           set.add(parentToolId);
         }
-        const subToolName = extractToolName(status);
+        // PrimeOffice: the real tool name when sent (engine MCP calls send sub-agents to the editor desk).
+        const subToolName = (msg.toolName as string | undefined) ?? extractToolName(status);
         os.setAgentTool(subId, subToolName);
         os.setAgentActive(subId, true);
       } else if (msg.type === 'subagentToolDone') {
