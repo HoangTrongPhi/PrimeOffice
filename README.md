@@ -21,6 +21,7 @@ npm install
 npm run check          # typecheck + mock coverage + cargo test: green before every hand-off
 npm run dev            # UI only; open http://localhost:1484/?mock for the fake backend
 npm run tauri dev      # desktop app with hot reload
+npm run guide          # docs/user-guide/PrimeOffice_User_Guide_{vi,en}.pdf from src/help/topics.ts (after Help changes)
 npm run assets         # re-index public/assets after adding art
 npm run release -- -Version 0.1.0 -Notes "First release" [-Publish]
 python scripts/gen-characters.py   # redraw the "PrimeOffice crew" character pack (needs Pillow)
@@ -37,6 +38,10 @@ Abyss first).
 | Projects | 2 | Opened folders with a Ready / Not ready pill and the full checklist: every missing item with its fix. `Ctrl+O` or drop a folder to open one. |
 | History | 3 | The latest sessions (all projects or one): title, last prompt, last three actions; the full view on the right. |
 | Agents | 4 | Which agents are found on this PC and whether the office can show them. |
+
+Everywhere: **F1** opens the in-app Help / Hướng dẫn (Vietnamese / English, on the current tab's topic; also while
+the office has focus), **Ctrl+K** the command palette, **Ctrl+O** opens a project folder, **F5** runs the current tab
+again, **Ctrl+`** shows the log, **Ctrl+,** the settings.
 
 ## Command line
 

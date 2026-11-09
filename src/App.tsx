@@ -2,6 +2,7 @@ import { CommandPalette, LogDrawer } from "@abyss/ui";
 import { Loader2 } from "lucide-react";
 import { Suspense, useMemo, type ComponentType } from "react";
 import { AppAbout } from "./components/layout/AppAbout";
+import { AppHelp } from "./components/layout/AppHelp";
 import { HeaderBar } from "./components/layout/HeaderBar";
 import { NavigationRail } from "./components/layout/NavigationRail";
 import { SettingsDialog } from "./components/layout/SettingsDialog";
@@ -57,6 +58,7 @@ export default function App() {
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={commands} onError={(item, err) => uiLog("error", `${item.label} failed: ${errorText(err)}`)} />
       <AppAbout />
+      <AppHelp />
       <SettingsDialog />
     </div>
   );

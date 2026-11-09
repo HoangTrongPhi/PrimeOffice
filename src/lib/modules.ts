@@ -17,7 +17,7 @@ export const MODULES: ModuleDef[] = [
   { id: "office", label: "Office", description: "Your agents at work in the pixel office", icon: Building2, hotkey: "1", accepts: "folder" },
   { id: "projects", label: "Projects", description: "Open a project folder and see what it is missing", icon: FolderCheck, hotkey: "2", accepts: "folder" },
   { id: "history", label: "History", description: "Recent sessions: last prompt, what was done, last reply", icon: History, hotkey: "3", accepts: "folder" },
-  { id: "providers", label: "Agents", description: "Claude Code, Codex, Gemini, DeepSeek on this PC", icon: PlugZap, hotkey: "4", accepts: "any" },
+  { id: "providers", label: "Agents", description: "Claude Code, Codex, Gemini, DeepSeek on this PC", icon: PlugZap, hotkey: "4", accepts: "folder" },
 ];
 
 export const moduleById = (id: TabId) => MODULES.find((m) => m.id === id) ?? MODULES[0];

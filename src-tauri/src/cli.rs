@@ -100,6 +100,18 @@ pub fn wants_cli(args: &[String]) -> bool {
     args.get(1).is_some_and(|a| SUBCOMMANDS.contains(&a.as_str()) || matches!(a.as_str(), "--help" | "-h" | "--version" | "-V"))
 }
 
+/// What a window start was given (Explorer's "Open with", a shortcut, `primeoffice.exe D:\Game`):
+/// `Ok(folder)` for an existing folder, `Err(arg)` for anything else, `None` without an argument or
+/// for a command-line start.
+pub fn open_with(args: &[String]) -> Option<Result<PathBuf, String>> {
+    if wants_cli(args) {
+        return None;
+    }
+    let arg = args.get(1)?;
+    let path = PathBuf::from(arg);
+    Some(if path.is_dir() { Ok(path) } else { Err(arg.clone()) })
+}
+
 /// Release builds use the Windows GUI subsystem: borrow the calling terminal's console for output.
 fn attach_console() {
     #[cfg(windows)]
@@ -301,6 +313,13 @@ mod tests {
     fn parses_flags() {
         assert!(!wants_cli(&args(&[])));
         assert!(!wants_cli(&args(&["D:/some/folder"])), "Open with → window");
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().to_string_lossy().into_owned();
+        assert_eq!(open_with(&args(&[&folder])), Some(Ok(dir.path().to_path_buf())));
+        let missing = dir.path().join("missing").to_string_lossy().into_owned();
+        assert_eq!(open_with(&args(&[&missing])), Some(Err(missing.clone())));
+        assert_eq!(open_with(&args(&[])), None);
+        assert_eq!(open_with(&args(&["check", &folder])), None, "a command, not a window");
         assert!(wants_cli(&args(&["check", "D:/a"])) && wants_cli(&args(&["providers"])) && wants_cli(&args(&["--help"])) && wants_cli(&args(&["--version"])));
 
         let c = Cli::try_parse_from(args(&["check", "D:/a", "--report", "r.json", "--quiet", "--fail-on", "warn"])).unwrap();

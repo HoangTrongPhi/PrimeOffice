@@ -21,7 +21,7 @@ pub(crate) struct Harness {
 #[allow(dead_code)]
 impl Harness {
     pub fn new() -> Self {
-        let app = super::configure(mock_builder()).build(mock_context(noop_assets())).expect("build mock app");
+        let app = super::configure(mock_builder(), None).build(mock_context(noop_assets())).expect("build mock app");
         let webview = WebviewWindowBuilder::new(&app, "main", Default::default()).build().expect("main window");
         Harness { app, webview }
     }
@@ -82,7 +82,7 @@ fn project_tree() -> tempfile::TempDir {
 }
 
 #[test]
-fn app_info_log_and_settings() {
+fn app_info_and_log() {
     let h = Harness::new();
     let info = h.ok("app_info", json!({}));
     assert!(info["version"].as_str().is_some_and(|v| !v.is_empty()));
@@ -95,8 +95,17 @@ fn app_info_log_and_settings() {
     assert!(logs.as_array().unwrap().iter().any(|l| l["source"] == "project"));
     assert_eq!(h.ok("ui_log", json!({ "level": "warn", "message": "from the UI" })), Value::Null);
     assert!(h.invoke("open_url", json!({ "url": "file:///C:/x" })).is_err());
-    assert!(h.invoke("set_settings", json!({ "settings": [1] })).is_err(), "object only");
-    assert!(h.ok("get_settings", json!({})).is_object());
+    assert_eq!(h.ok("take_startup_folder", json!({})), Value::Null, "started without a folder");
+}
+
+#[test]
+fn startup_folder_is_handed_over_once() {
+    let dir = project_tree();
+    let app = super::configure(mock_builder(), Some(Ok(dir.path().to_path_buf()))).build(mock_context(noop_assets())).expect("build mock app");
+    let webview = WebviewWindowBuilder::new(&app, "main", Default::default()).build().expect("main window");
+    let h = Harness { app, webview };
+    assert_eq!(h.ok("take_startup_folder", json!({})), json!(s(dir.path())));
+    assert_eq!(h.ok("take_startup_folder", json!({})), Value::Null, "a UI reload does not open it again");
 }
 
 #[test]
@@ -125,6 +134,9 @@ fn office_snapshot_and_messages() {
     assert!(snap["activity"].is_array());
     assert!(h.ok("office_agents", json!({})).is_array());
     assert_eq!(h.ok("office_send", json!({ "message": { "type": "focusAgent", "id": 1 } })), Value::Null, "observer-only: ignored");
+    assert_eq!(h.ok("office_send", json!({ "message": { "type": "closeAgent", "id": 999 } })), Value::Null, "unknown agent: nothing to hide");
+    assert!(h.invoke("office_send", json!({ "message": { "type": "closeAgent" } })).is_err());
+    assert_eq!(snap["areaMappings"]["type"], "areaMappingsLoaded");
     assert!(h.invoke("office_send", json!({ "message": { "type": "saveLayout" } })).is_err());
     assert_eq!(h.ok("office_set_filter", json!({ "filter": { "projects": [], "windowMinutes": 45 } })), Value::Null);
 }

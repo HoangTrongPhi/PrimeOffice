@@ -30,9 +30,6 @@ export interface JobProgressEvent {
   message: string;
 }
 
-/** `app_data_dir()/settings.json`; each app defines its fields. */
-export type AppSettings = Record<string, unknown>;
-
 // ---------------------------------------------------------------- sessions (core::providers)
 
 export type ActionKind = "read" | "edit" | "run" | "search" | "web" | "subagent" | "ask" | "plan" | "skill" | "other";
@@ -123,7 +120,11 @@ export interface ProjectReport {
 export type OfficeMessage = { type: string } & Record<string, unknown>;
 
 export interface OfficeSnapshot {
+  /** `settingsLoaded`, with the saved Sound / Always Show Labels / Show Areas. */
   settings: OfficeMessage;
+  /** `areaMappingsLoaded`: the saved folder ↔ area mapping. */
+  areaMappings: OfficeMessage;
+  /** `existingAgents`; `agentMeta` carries remembered seats. */
   existing: OfficeMessage;
   layout: Record<string, unknown> | null;
   activity: OfficeMessage[];

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { routeDrop } from "../lib/dropRouter";
 import { inTauri, ipc, on } from "../lib/ipc";
 import { errorText, uiLog, useAppStore } from "../stores/appStore";
 import { startupUpdateCheck } from "../stores/updateStore";
@@ -27,6 +28,18 @@ export function useBackendBridge() {
         void startupUpdateCheck(info);
       })
       .catch((err) => uiLog("error", `app_info failed: ${errorText(err)}`));
+    // Started with a folder (Explorer's "Open with", `primeoffice.exe D:\Game`): open it as if it
+    // were dropped on the Office — the office shows it when it is Ready, Projects otherwise.
+    // Not gated on `disposed`: the folder is handed out once, so a cleanup (StrictMode's double
+    // effect run) must not drop it.
+    ipc
+      .takeStartupFolder()
+      .then((folder) => {
+        if (!folder) return;
+        useAppStore.getState().setActiveTab("office");
+        routeDrop("office", [folder]);
+      })
+      .catch((err) => uiLog("error", `Start folder: ${errorText(err)}`));
     return () => {
       disposed = true;
       void unlisten.then((fn) => fn());

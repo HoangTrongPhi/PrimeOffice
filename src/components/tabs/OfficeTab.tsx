@@ -1,6 +1,7 @@
 import { EmptyState, PillBadge } from "@abyss/ui";
 import { Building2, ChevronRight, FolderOpen, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { handleHelpKey } from "../../hooks/useGlobalHotkeys";
 import { pickPaths } from "../../lib/dialogs";
 import { connectOfficeFrame } from "../../office/bridge/officeBridge";
 import { useOfficeStore, useProjectStore } from "../../stores/dataStore";
@@ -11,6 +12,26 @@ export const CHARACTER_PACKS: { id: string; label: string }[] = [
   { id: "pixel", label: "PrimeOffice crew" },
   { id: "classic", label: "Classic (pixel-agents)" },
 ];
+
+/** Office documents that already pass F1 on (each reload of the frame is a new document). */
+const helpKeyDocs = new WeakSet<Document>();
+
+/**
+ * While the office frame has focus its own document gets the keys, so F1 would never reach the
+ * shell's hotkey handler: listen in the frame too (same origin). Skips the frame's initial
+ * about:blank and documents already wired.
+ */
+function forwardHelpKey(frame: HTMLIFrameElement) {
+  try {
+    const win = frame.contentWindow;
+    const doc = frame.contentDocument;
+    if (!win || !doc || doc.URL === "about:blank" || helpKeyDocs.has(doc)) return;
+    helpKeyDocs.add(doc);
+    win.addEventListener("keydown", (e) => void handleHelpKey(e));
+  } catch {
+    // Not reachable: F1 works again once focus is back in the shell.
+  }
+}
 
 /** The pixel office (an iframe running the vendored pixel-agents UI) with the agent list and detail. */
 export function OfficeTab() {
@@ -36,6 +57,16 @@ export function OfficeTab() {
       onAgentsChanged: () => void refreshAgents(),
     });
   }, [pack, frameKey, select, refreshAgents]);
+
+  // F1 from inside the office: wire every document the frame loads (it may already be loaded).
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const wire = () => forwardHelpKey(frame);
+    frame.addEventListener("load", wire);
+    wire();
+    return () => frame.removeEventListener("load", wire);
+  }, [pack, frameKey]);
 
   // Labels, prompts and actions change every turn: keep the side list fresh.
   useEffect(() => {

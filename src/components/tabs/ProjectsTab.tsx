@@ -8,6 +8,21 @@ import { useHistoryStore, useOfficeStore, useProjectStore } from "../../stores/d
 import type { ProjectCheck, ProjectReport } from "../../types/primeoffice";
 import { relTime } from "../session/SessionView";
 
+const LEVELS: [ProjectCheck["severity"], string][] = [
+  ["error", "required"],
+  ["warn", "recommended"],
+  ["info", "optional"],
+];
+
+/** What is still missing, by level: "2 recommended, 1 optional missing" (or "nothing missing"). */
+function missingSummary(checks: ProjectCheck[]): string {
+  const missing = checks.filter((c) => !c.passed);
+  const parts = LEVELS.map(([sev, label]) => [missing.filter((c) => c.severity === sev).length, label] as const)
+    .filter(([n]) => n > 0)
+    .map(([n, label]) => `${n} ${label}`);
+  return parts.length ? `${parts.join(", ")} missing` : "nothing missing";
+}
+
 function CheckRow({ c }: { c: ProjectCheck }) {
   const Icon = c.passed ? CheckCircle2 : c.severity === "error" ? XCircle : c.severity === "warn" ? Circle : Info;
   const tone = c.passed ? "text-emerald" : c.severity === "error" ? "text-rose" : c.severity === "warn" ? "text-amber" : "text-ink-faint";
@@ -80,7 +95,7 @@ function Report({ r }: { r: ProjectReport }) {
 
       {missing.length > 0 && (
         <div className={`rounded-lg border px-3 py-2 text-[12px] ${r.ready ? "border-amber/30 bg-amber/8 text-amber" : "border-rose/30 bg-rose/8 text-rose"}`}>
-          {r.ready ? `Viewable. ${missing.length} recommended item(s) missing:` : `Cannot be reviewed yet. Missing:`} {missing.map((c) => c.title).join(", ")}.
+          {r.ready ? `Viewable. ${missingSummary(r.checks)}:` : `Cannot be reviewed yet. Missing:`} {missing.map((c) => c.title).join(", ")}.
         </div>
       )}
 
@@ -119,7 +134,7 @@ export function ProjectsTab() {
                 <span className={`size-2 shrink-0 rounded-full ${p.ready ? "bg-emerald" : "bg-rose"}`} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12.5px] text-ink">{p.name}</span>
-                  <span className="block truncate text-[10.5px] text-ink-faint">{p.ready ? `${p.checks.filter((c) => !c.passed).length} recommended missing` : "not ready"}</span>
+                  <span className="block truncate text-[10.5px] text-ink-faint">{p.ready ? missingSummary(p.checks) : "not ready"}</span>
                 </span>
               </button>
             </li>

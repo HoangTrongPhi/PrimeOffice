@@ -1,11 +1,12 @@
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use serde::Serialize;
+use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Manager, Runtime, State};
 
 use crate::utils::jobs::JobRegistry;
 use crate::utils::logbus::{LogBus, LogEntry};
-use crate::utils::paths::write_atomic;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -84,23 +85,58 @@ pub fn reveal_in_explorer(path: String) -> Result<(), String> {
     result.map(|_| ()).map_err(|e| e.to_string())
 }
 
-/// `%LOCALAPPDATA%\<identifier>\settings.json`: app-level settings the command line reads too.
-pub fn settings_path<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
-    app.path().app_local_data_dir().unwrap_or_else(|_| std::env::temp_dir().join(env!("CARGO_PKG_NAME"))).join("settings.json")
-}
-
-/// Saved settings, `{}` when none were saved yet.
-#[tauri::command]
-pub fn get_settings<R: Runtime>(app: AppHandle<R>) -> serde_json::Value {
-    std::fs::read_to_string(settings_path(&app)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_else(|| serde_json::json!({}))
-}
-
-#[tauri::command]
-pub fn set_settings<R: Runtime>(app: AppHandle<R>, settings: serde_json::Value) -> Result<(), String> {
-    if !settings.is_object() {
-        return Err("Settings must be a JSON object".into());
+/// The user guide PDF bundled as a resource (`docs/user-guide/PrimeOffice_User_Guide_<lang>.pdf`, built
+/// from the Help content by `npm run guide`); Vietnamese unless `lang` is `en`.
+pub fn user_guide_path<R: Runtime>(app: &AppHandle<R>, lang: &str) -> Result<PathBuf, String> {
+    let lang = if lang == "en" { "en" } else { "vi" };
+    let path = app.path().resolve(format!("user-guide/PrimeOffice_User_Guide_{lang}.pdf"), BaseDirectory::Resource).map_err(|e| e.to_string())?;
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(format!("User guide not found: {}", path.display()))
     }
-    let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    let path = settings_path(&app);
-    write_atomic(&path, json.as_bytes()).map_err(|e| format!("Cannot write {}: {e}", path.display()))
+}
+
+/// Open the user guide PDF in the default PDF viewer.
+#[tauri::command]
+pub fn open_user_guide<R: Runtime>(app: AppHandle<R>, lang: String) -> Result<(), String> {
+    let path = user_guide_path(&app, &lang)?;
+    #[cfg(windows)]
+    let result = std::process::Command::new("explorer").arg(&path).spawn();
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(&path).spawn();
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open").arg(&path).spawn();
+    result.map(|_| ()).map_err(|e| e.to_string())
+}
+
+/// The folder the window was started with (Explorer's "Open with", `primeoffice.exe D:\Game`),
+/// handed to the UI once.
+pub struct StartupFolder(Mutex<Option<String>>);
+
+impl StartupFolder {
+    pub fn new(folder: Option<String>) -> Self {
+        StartupFolder(Mutex::new(folder))
+    }
+}
+
+/// The start folder the first time it is asked for, then null (a reload of the UI does not open it again).
+#[tauri::command]
+pub fn take_startup_folder(startup: State<'_, StartupFolder>) -> Option<String> {
+    startup.0.lock().ok().and_then(|mut f| f.take())
+}
+
+#[cfg(test)]
+mod tests {
+    /// `open_user_guide` resolves `user-guide/PrimeOffice_User_Guide_<lang>.pdf`: both PDFs exist and are bundled there.
+    #[test]
+    fn user_guide_pdfs_are_bundled() {
+        let conf: serde_json::Value = serde_json::from_str(include_str!("../../tauri.conf.json")).unwrap();
+        for lang in ["vi", "en"] {
+            let file = format!("PrimeOffice_User_Guide_{lang}.pdf");
+            let source = format!("../docs/user-guide/{file}");
+            assert_eq!(conf["bundle"]["resources"][&source], format!("user-guide/{file}"), "tauri.conf.json bundle.resources");
+            assert!(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(&source).is_file(), "{source} missing: run npm run guide");
+        }
+    }
 }

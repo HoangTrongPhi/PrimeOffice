@@ -75,7 +75,11 @@
     "createUpdaterArtifacts": true,
     "publisher": "Phineas",
     "copyright": "© 2026 Hoàng Trọng Phi",
-    "homepage": "https://github.com/HoangTrongPhi/PrimeOffice"
+    "homepage": "https://github.com/HoangTrongPhi/PrimeOffice",
+    "resources": {
+      "../docs/user-guide/PrimeOffice_User_Guide_vi.pdf": "user-guide/PrimeOffice_User_Guide_vi.pdf",
+      "../docs/user-guide/PrimeOffice_User_Guide_en.pdf": "user-guide/PrimeOffice_User_Guide_en.pdf"
+    }
   },
   "plugins": {
     "updater": {

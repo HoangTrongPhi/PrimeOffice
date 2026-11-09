@@ -4,7 +4,6 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AgentSession,
   AppInfo,
-  AppSettings,
   LogEntry,
   OfficeAgent,
   OfficeFilter,
@@ -30,8 +29,9 @@ export const ipc = {
   cancelJob: (jobId: number) => invoke<boolean>("cancel_job", { jobId }),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
   revealInExplorer: (path: string) => invoke<void>("reveal_in_explorer", { path }),
-  getSettings: () => invoke<AppSettings>("get_settings"),
-  setSettings: (settings: AppSettings) => invoke<void>("set_settings", { settings }),
+  openUserGuide: (lang: string) => invoke<void>("open_user_guide", { lang }),
+  /** The folder the window was started with ("Open with"), once; null afterwards. */
+  takeStartupFolder: () => invoke<string | null>("take_startup_folder"),
 
   officeSnapshot: () => invoke<OfficeSnapshot>("office_snapshot"),
   officeSend: (message: OfficeMessage) => invoke<void>("office_send", { message }),

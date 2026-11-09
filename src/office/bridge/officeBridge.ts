@@ -53,7 +53,10 @@ export function connectOfficeFrame(frame: HTMLIFrameElement, pack: string, event
       const [assets, snap] = await Promise.all([assetsFor(pack), inTauri ? ipc.officeSnapshot() : Promise.resolve(null)]);
       if (disposed) return;
       post({ type: "providerCapabilities", readingTools: READING_TOOLS, subagentToolNames: SUBAGENT_TOOLS });
-      if (snap) post(snap.settings);
+      if (snap) {
+        post(snap.settings);
+        post(snap.areaMappings);
+      }
       assets.messages.forEach(post);
       post(snap?.existing ?? { type: "existingAgents", agents: [], agentMeta: {}, directoryNames: {}, externalAgents: {} });
       post({ type: "layoutLoaded", layout: snap?.layout ?? assets.defaultLayout });
@@ -77,9 +80,17 @@ export function connectOfficeFrame(frame: HTMLIFrameElement, pack: string, event
       case "focusAgent":
         events.onFocusAgent(m.id as number);
         break;
+      // Saved by the backend (office_cmd::office_send): the layout, the office's own settings,
+      // seats and folder areas come back on the next load; × hides an agent until it works again.
       case "saveLayout":
       case "exportLayout":
       case "importLayout":
+      case "closeAgent":
+      case "setSoundEnabled":
+      case "setAlwaysShowLabels":
+      case "setShowAreas":
+      case "saveAreaMappings":
+      case "saveAgentSeats":
         if (inTauri) ipc.officeSend(m).catch((err) => uiLog("error", `Office: ${errorText(err)}`));
         break;
       default:

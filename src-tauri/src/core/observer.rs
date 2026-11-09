@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::providers::{modified_ms, read_lines_from, read_session_bounded, AgentProvider, AgentSession, SessionParser, SessionStatus};
@@ -34,6 +35,19 @@ struct Tracked {
     shown: Option<Shown>,
     context: u64,
     session: Option<AgentSession>,
+    /// Closed with the office's × (`closeAgent`): hidden until the transcript grows again.
+    dismissed: bool,
+}
+
+/// Where an agent sits and how it looks (pixel-agents' `SeatAssignment`), remembered per transcript
+/// so seat moves survive an office reload and an app restart.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Seat {
+    pub palette: u32,
+    pub hue_shift: u32,
+    #[serde(default)]
+    pub seat_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,6 +69,8 @@ pub struct Observer {
     tracked: HashMap<PathBuf, Tracked>,
     next_id: u32,
     config: ObserverConfig,
+    /// Remembered seats by transcript path.
+    seats: HashMap<PathBuf, Seat>,
 }
 
 fn palette_for(id: u32) -> (u32, u32) {
@@ -78,7 +94,45 @@ fn shown_for(s: &AgentSession) -> Shown {
 
 impl Observer {
     pub fn new(providers: Vec<Box<dyn AgentProvider>>, config: ObserverConfig) -> Self {
-        Observer { providers, tracked: HashMap::new(), next_id: 1, config }
+        Observer { providers, tracked: HashMap::new(), next_id: 1, config, seats: HashMap::new() }
+    }
+
+    /// Seats remembered from an earlier run (applied to agents created from now on).
+    pub fn set_seats(&mut self, seats: HashMap<PathBuf, Seat>) {
+        self.seats = seats;
+    }
+
+    pub fn seats(&self) -> &HashMap<PathBuf, Seat> {
+        &self.seats
+    }
+
+    /// The office's `saveAgentSeats` (keyed by agent id): remember each seat by its transcript.
+    /// Returns true when something changed.
+    pub fn remember_seats(&mut self, by_id: &HashMap<u32, Seat>) -> bool {
+        let mut changed = false;
+        for (path, t) in &mut self.tracked {
+            let Some(seat) = by_id.get(&t.agent_id) else { continue };
+            t.palette = seat.palette;
+            t.hue_shift = seat.hue_shift;
+            if self.seats.get(path) != Some(seat) {
+                self.seats.insert(path.clone(), seat.clone());
+                changed = true;
+            }
+        }
+        changed
+    }
+
+    /// The office's × (`closeAgent`). An observer cannot end a session, so the agent is hidden: it
+    /// leaves on the next tick and walks back in when its transcript grows again (same id, same
+    /// seat). False when no agent has that id.
+    pub fn dismiss(&mut self, agent_id: u32) -> bool {
+        match self.tracked.values_mut().find(|t| t.agent_id == agent_id) {
+            Some(t) => {
+                t.dismissed = true;
+                true
+            }
+            None => false,
+        }
     }
 
     pub fn config(&self) -> &ObserverConfig {
@@ -123,6 +177,10 @@ impl Observer {
                         if let Ok((lines, end)) = read_lines_from(&file, t.offset) {
                             lines.iter().for_each(|l| t.parser.feed_line(l));
                             t.offset = end;
+                            // New lines = the agent is at work again: a closed agent comes back.
+                            if !lines.is_empty() {
+                                t.dismissed = false;
+                            }
                         }
                         t.len = len;
                         t.mtime = mtime;
@@ -132,8 +190,8 @@ impl Observer {
                     let Ok(offset) = read_session_bounded(parser.as_mut(), &file) else { continue };
                     let agent_id = self.next_id;
                     self.next_id += 1;
-                    let (palette, hue_shift) = palette_for(agent_id);
-                    self.tracked.insert(file.clone(), Tracked { agent_id, parser, offset, len, mtime, palette, hue_shift, directory: String::new(), tools: Vec::new(), shown: None, context: 0, session: None });
+                    let (palette, hue_shift) = self.seats.get(&file).map(|s| (s.palette, s.hue_shift)).unwrap_or_else(|| palette_for(agent_id));
+                    self.tracked.insert(file.clone(), Tracked { agent_id, parser, offset, len, mtime, palette, hue_shift, directory: String::new(), tools: Vec::new(), shown: None, context: 0, session: None, dismissed: false });
                 }
             }
         }
@@ -151,9 +209,22 @@ impl Observer {
                 continue;
             }
             let id = t.agent_id;
+            if t.dismissed {
+                if t.shown.take().is_some() {
+                    out.push(json!({ "type": "agentClosed", "id": id }));
+                }
+                // Sent again in full when it comes back.
+                t.tools.clear();
+                t.context = 0;
+                continue;
+            }
             if t.shown.is_none() {
                 t.directory = Path::new(&s.cwd).file_name().map(|n| n.to_string_lossy().into_owned()).filter(|n| !n.is_empty()).unwrap_or_else(|| s.title.clone());
-                out.push(json!({ "type": "agentCreated", "id": id, "directoryName": t.directory, "isExternal": true, "palette": t.palette, "hueShift": t.hue_shift }));
+                let mut created = json!({ "type": "agentCreated", "id": id, "directoryName": t.directory, "isExternal": true, "palette": t.palette, "hueShift": t.hue_shift });
+                if let Some(seat) = self.seats.get(path).and_then(|s| s.seat_id.clone()) {
+                    created["seatId"] = json!(seat);
+                }
+                out.push(created);
                 t.shown = Some(Shown::Active);
             }
             // Tools.
@@ -204,19 +275,23 @@ impl Observer {
     /// Everything a freshly loaded office needs, after its layout: `existingAgents` first, then each
     /// agent's tools, bubble and context gauge (the order pixel-agents' server uses).
     pub fn snapshot(&self) -> (Value, Vec<Value>) {
-        let mut shown: Vec<&Tracked> = self.tracked.values().filter(|t| t.shown.is_some()).collect();
-        shown.sort_by_key(|t| t.agent_id);
+        let mut shown: Vec<(&PathBuf, &Tracked)> = self.tracked.iter().filter(|(_, t)| t.shown.is_some()).collect();
+        shown.sort_by_key(|(_, t)| t.agent_id);
         let mut meta = serde_json::Map::new();
         let mut dirs = serde_json::Map::new();
         let mut external = serde_json::Map::new();
-        for t in &shown {
-            meta.insert(t.agent_id.to_string(), json!({ "palette": t.palette, "hueShift": t.hue_shift }));
+        for (path, t) in &shown {
+            let mut m = json!({ "palette": t.palette, "hueShift": t.hue_shift });
+            if let Some(seat) = self.seats.get(*path).and_then(|s| s.seat_id.clone()) {
+                m["seatId"] = json!(seat);
+            }
+            meta.insert(t.agent_id.to_string(), m);
             dirs.insert(t.agent_id.to_string(), json!(t.directory));
             external.insert(t.agent_id.to_string(), json!(true));
         }
-        let existing = json!({ "type": "existingAgents", "agents": shown.iter().map(|t| t.agent_id).collect::<Vec<_>>(), "agentMeta": meta, "directoryNames": dirs, "externalAgents": external });
+        let existing = json!({ "type": "existingAgents", "agents": shown.iter().map(|(_, t)| t.agent_id).collect::<Vec<_>>(), "agentMeta": meta, "directoryNames": dirs, "externalAgents": external });
         let mut activity = Vec::new();
-        for t in &shown {
+        for (_, t) in &shown {
             for (tid, label, tool) in &t.tools {
                 activity.push(json!({ "type": "agentToolStart", "id": t.agent_id, "toolId": tid, "status": label, "toolName": tool }));
             }
@@ -311,6 +386,58 @@ mod tests {
         assert!(obs.tick(m + 1_000).is_empty());
         obs.set_config(ObserverConfig { window_ms: 60_000, projects: vec![PathBuf::from("D:\\Game")] });
         assert_eq!(types(&obs.tick(m + 1_000))[0], "agentCreated");
+    }
+
+    #[test]
+    fn closed_agents_come_back_when_they_work_again() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("D--Game");
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("s1.jsonl");
+        let at = "2026-11-09T06:00:00.000Z";
+        append(&file, &fixtures::user("Fix it", at));
+        append(&file, &fixtures::tool_use("t1", "Edit", json!({ "file_path": "a.rs" }), at));
+        let now = modified_ms(&file);
+        let mut obs = Observer::new(vec![Box::new(ClaudeProvider::new(tmp.path().to_path_buf()))], ObserverConfig { window_ms: u64::MAX / 2, projects: vec![] });
+        assert_eq!(types(&obs.tick(now))[0], "agentCreated");
+
+        assert!(!obs.dismiss(99), "unknown id");
+        assert!(obs.dismiss(1));
+        assert_eq!(types(&obs.tick(now)), ["agentClosed"]);
+        assert!(obs.tick(now).is_empty(), "stays hidden while nothing happens");
+        assert!(obs.agents().is_empty());
+        assert_eq!(obs.snapshot().0["agents"], json!([]));
+
+        append(&file, &fixtures::tool_result("t1", at));
+        append(&file, &fixtures::tool_use("t2", "Bash", json!({ "command": "cargo test" }), at));
+        let back = obs.tick(now + 1);
+        assert_eq!(types(&back)[..2], ["agentCreated", "agentToolStart"]);
+        assert_eq!(back[0]["id"], 1, "same agent, same id");
+        assert_eq!(obs.agents().len(), 1);
+    }
+
+    #[test]
+    fn remembers_seats_by_transcript() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("D--Game");
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("s1.jsonl");
+        append(&file, &fixtures::user("hi", "2026-11-09T06:00:00Z"));
+        let now = modified_ms(&file);
+        let config = ObserverConfig { window_ms: u64::MAX / 2, projects: vec![] };
+        let mut obs = Observer::new(vec![Box::new(ClaudeProvider::new(tmp.path().to_path_buf()))], config.clone());
+        obs.tick(now);
+        let seat = Seat { palette: 4, hue_shift: 90, seat_id: Some("desk-7".into()) };
+        assert!(obs.remember_seats(&HashMap::from([(1, seat.clone()), (42, seat.clone())])));
+        assert!(!obs.remember_seats(&HashMap::from([(1, seat.clone())])), "unchanged");
+        assert_eq!(obs.seats().get(&file), Some(&seat));
+        assert_eq!(obs.snapshot().0["agentMeta"]["1"], json!({ "palette": 4, "hueShift": 90, "seatId": "desk-7" }));
+
+        // Next run (app restart): the seat comes back with the agent.
+        let mut next = Observer::new(vec![Box::new(ClaudeProvider::new(tmp.path().to_path_buf()))], config);
+        next.set_seats(obs.seats().clone());
+        let created = next.tick(now);
+        assert_eq!((created[0]["seatId"].as_str(), created[0]["palette"].as_u64(), created[0]["hueShift"].as_u64()), (Some("desk-7"), Some(4), Some(90)));
     }
 
     #[test]

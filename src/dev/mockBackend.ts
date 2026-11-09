@@ -3,7 +3,9 @@
  * `http://localhost:1484/?mock`. Never active in production builds or inside Tauri.
  * It answers every command in `src/lib/ipc.ts` (checked by `npm run check:mock`) and the plugin
  * commands the UI uses. Three agents work in the office: one edits files in a loop, one waits for
- * an answer, one has finished its turn; one project is ready, one is not.
+ * an answer, one has finished its turn; one project is ready, one is not. The office's own settings,
+ * seats and folder areas are kept in localStorage (`primeoffice.mock-office`) like office.json;
+ * `?mock&open=D:\Projects\StarHarbor` plays a start with an "Open with" folder.
  */
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
@@ -128,6 +130,49 @@ const PROVIDERS: ProviderStatus[] = [
   { id: "deepseek", name: "DeepSeek", state: "unsupported", sessionRoot: null, sessions: 0, observable: false, note: "No local session format yet; planned through the tool that runs DeepSeek" },
 ];
 
+// ---------------------------------------------------------------- office prefs (office_cmd::OfficePrefs)
+
+interface MockSeat {
+  palette: number;
+  hueShift: number;
+  seatId: string | null;
+}
+interface MockOfficePrefs {
+  soundEnabled: boolean;
+  alwaysShowLabels: boolean;
+  showAreas: boolean;
+  areaMappings: Record<string, string[]>;
+  /** By agent id here (ids are fixed in the mock); by transcript path in the real backend. */
+  seats: Record<string, MockSeat>;
+}
+const PREFS_KEY = "primeoffice.mock-office";
+const DEFAULT_PREFS: MockOfficePrefs = { soundEnabled: false, alwaysShowLabels: true, showAreas: false, areaMappings: {}, seats: {} };
+function loadPrefs(): MockOfficePrefs {
+  try {
+    return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") };
+  } catch {
+    return { ...DEFAULT_PREFS };
+  }
+}
+function savePrefs(p: MockOfficePrefs) {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+  } catch {
+    // not kept; fine for the mock
+  }
+}
+let prefs = loadPrefs();
+
+/** Agents closed with ×: hidden until they work again (only agent 1 works in the mock). */
+const hidden = new Set<number>();
+const DIRS: Record<number, string> = { 1: "StarHarbor", 2: "StarHarbor", 3: "BuildTools" };
+const meta = (id: number) => {
+  const seat = prefs.seats[id];
+  return { palette: seat?.palette ?? id - 1, hueShift: seat?.hueShift ?? 0, ...(seat?.seatId ? { seatId: seat.seatId } : {}) };
+};
+
+let startupFolder = new URLSearchParams(location.search).get("open");
+
 const log = (level: string, source: string, message: string) => emit("log://entry", { tsMs: Date.now(), level, source, message });
 
 /** Agent 1 keeps working: a new tool every few seconds. */
@@ -142,6 +187,11 @@ function startOfficeLoop() {
   let open: string | null = "t-run";
   setInterval(() => {
     const msgs: OfficeMessage[] = [];
+    if (hidden.delete(1)) {
+      // Closed with the office's x, and now at work again: it walks back in, to its remembered seat.
+      msgs.push({ type: "agentCreated", id: 1, directoryName: DIRS[1], isExternal: true, ...meta(1) });
+      open = null;
+    }
     if (open) msgs.push({ type: "agentToolDone", id: 1, toolId: open });
     const [tool, label] = labels[n++ % labels.length];
     open = `t${n}`;
@@ -174,32 +224,73 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
         case "open_url":
           window.open(a.url, "_blank", "noopener");
           return null;
+        case "open_user_guide":
+          console.info("mockBackend: open user guide", a.lang);
+          return null;
         case "reveal_in_explorer":
           console.info("mockBackend: reveal", a.path);
           return null;
-        case "get_settings":
-          return JSON.parse(localStorage.getItem("primeoffice.mock-settings") ?? "{}");
-        case "set_settings":
-          localStorage.setItem("primeoffice.mock-settings", JSON.stringify(a.settings));
-          return null;
+        case "take_startup_folder": {
+          const folder = startupFolder;
+          startupFolder = null;
+          return folder;
+        }
 
-        case "office_snapshot":
+        case "office_snapshot": {
+          const shown = [1, 2, 3].filter((id) => !hidden.has(id));
+          const byId = (f: (id: number) => unknown) => Object.fromEntries(shown.map((id) => [id, f(id)]));
+          const activity: OfficeMessage[] = [
+            { type: "agentToolStart", id: 1, toolId: "t-run", status: "Running: npm test -- inventory", toolName: "Bash" },
+            { type: "agentStatus", id: 2, status: "waiting", awaitingInput: true },
+            { type: "agentContextUsage", id: 2, contextTokens: 152_000, maxContextTokens: 200_000 },
+            { type: "agentStatus", id: 3, status: "waiting" },
+          ];
           return {
-            settings: { type: "settingsLoaded", soundEnabled: false, lastSeenVersion: "0.1", extensionVersion: "0.1.0", watchAllSessions: true, alwaysShowLabels: true, ghostHeadlessAgents: false, hooksEnabled: false, hooksInfoShown: true, externalAssetDirectories: [], showAreas: false, bypassPermissions: false, showHostDirectories: false },
-            existing: { type: "existingAgents", agents: [1, 2, 3], agentMeta: { 1: { palette: 0, hueShift: 0 }, 2: { palette: 1, hueShift: 0 }, 3: { palette: 2, hueShift: 0 } }, directoryNames: { 1: "StarHarbor", 2: "StarHarbor", 3: "BuildTools" }, externalAgents: { 1: true, 2: true, 3: true } },
+            settings: { type: "settingsLoaded", soundEnabled: prefs.soundEnabled, lastSeenVersion: "0.1", extensionVersion: "0.1.0", watchAllSessions: true, alwaysShowLabels: prefs.alwaysShowLabels, ghostHeadlessAgents: false, hooksEnabled: false, hooksInfoShown: true, externalAssetDirectories: [], showAreas: prefs.showAreas, bypassPermissions: false, showHostDirectories: false },
+            areaMappings: { type: "areaMappingsLoaded", mappings: prefs.areaMappings },
+            existing: { type: "existingAgents", agents: shown, agentMeta: byId(meta), directoryNames: byId((id) => DIRS[id]), externalAgents: byId(() => true) },
             layout: null,
-            activity: [
-              { type: "agentToolStart", id: 1, toolId: "t-run", status: "Running: npm test -- inventory", toolName: "Bash" },
-              { type: "agentStatus", id: 2, status: "waiting", awaitingInput: true },
-              { type: "agentContextUsage", id: 2, contextTokens: 152_000, maxContextTokens: 200_000 },
-              { type: "agentStatus", id: 3, status: "waiting" },
-            ],
+            activity: activity.filter((m) => !hidden.has(m.id as number)),
           };
-        case "office_send":
-          if (a.message?.type === "saveLayout") await log("info", "office", "Layout saved");
+        }
+        case "office_send": {
+          const m = (a.message ?? {}) as OfficeMessage;
+          switch (m.type) {
+            case "saveLayout":
+              await log("info", "office", "Layout saved");
+              return null;
+            case "closeAgent": {
+              const id = m.id as number;
+              if (!DIRS[id] || hidden.has(id)) return null;
+              hidden.add(id);
+              await log("info", "office", `Agent ${id} hidden until it works again`);
+              // The real observer closes it on its next tick.
+              setTimeout(() => void emit("office://message", [{ type: "agentClosed", id }]), 300);
+              return null;
+            }
+            case "setSoundEnabled":
+              prefs = { ...prefs, soundEnabled: !!m.enabled };
+              break;
+            case "setAlwaysShowLabels":
+              prefs = { ...prefs, alwaysShowLabels: !!m.enabled };
+              break;
+            case "setShowAreas":
+              prefs = { ...prefs, showAreas: !!m.enabled };
+              break;
+            case "saveAreaMappings":
+              prefs = { ...prefs, areaMappings: (m.mappings ?? {}) as Record<string, string[]> };
+              break;
+            case "saveAgentSeats":
+              prefs = { ...prefs, seats: { ...prefs.seats, ...(m.seats as Record<string, MockSeat>) } };
+              break;
+            default:
+              return null;
+          }
+          savePrefs(prefs);
           return null;
+        }
         case "office_agents":
-          return SESSIONS.map((session, i) => ({ id: i + 1, session }));
+          return SESSIONS.map((session, i) => ({ id: i + 1, session })).filter(({ id }) => !hidden.has(id));
         case "office_set_filter":
           return null;
 

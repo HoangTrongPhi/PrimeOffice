@@ -199,3 +199,5 @@ registerDropHandler("office", (p) =>
   }),
 );
 registerDropHandler("history", (p) => void openFolder(p, (path) => useHistoryStore.getState().setProject(path)));
+// The Agents tab has nothing to filter by folder: show the opened project's report instead.
+registerDropHandler("providers", (p) => void openFolder(p, () => useAppStore.getState().setActiveTab("projects")));

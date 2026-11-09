@@ -24,6 +24,8 @@
   (installer 3.47 MB, latest.json, .sig, SHA256SUMS) [x] Abyss catalog set to `available` (revision 5, not pushed)
   [ ] `gh repo create HoangTrongPhi/PrimeOffice --public --source . --push` [ ] `gh release create v0.1.0 release/0.1.0/*`
   [ ] push Abyss (catalog) — the agent's auto mode blocks creating public repos/releases, so the user runs these
+- [x] In-app Help / Hướng dẫn (F1, header "?", palette; VI / EN, `src/help/topics.ts` on `@abyss/ui` `HelpPanel`)
+  added 2026-11-09 after the 0.1.0 build — not in `release/0.1.0`
 - [ ] P6 Codex / Gemini sessions (formats to verify on a PC that has them)
 - [ ] P7 Optional Claude hooks via `primeoffice.exe hook` (exact permission bubbles)
 
@@ -36,6 +38,9 @@
 - 2026-11-09 — Q4: keep the classic characters — JIK-A-4 allows commercial use, credit in docs/ASSETS.md (agent, from the author's own statements)
 - Q1 (active window 30 min), Q2 (history summary: mechanical, no LLM), Q3 (DeepSeek route): open;
   current defaults are 30 min / mechanical / "planned"
+
+- 2026-11-09: fixed Close agent (hide until active), persisted office prefs/seats/areas (`office.json`), Agents-tab
+  folder open, CLI "open with" folder, Projects missing-count wording; removed `get_settings`/`set_settings`.
 
 ## Known issues / next steps
 - CSP needs `frame-src 'self'`, `connect-src 'self'` (asset fetches) and `font-src 'self' data:` — keep them.
