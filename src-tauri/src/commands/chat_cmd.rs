@@ -22,7 +22,9 @@ use crate::utils::logbus::{self, Level};
 /// Event name; keep in sync with `EVENTS.chat` in `src/lib/ipc.ts`. Payload: `{ chatId, line }` for
 /// each stream-json record of the CLI, then one `{ chatId, done: { code, stderr } }`.
 pub const CHAT_EVENT: &str = "chat://event";
-const PERMISSION_MODES: &[&str] = &["default", "acceptEdits", "plan", "bypassPermissions"];
+/// The modes Chat offers, by the names Claude Code 2.1.319 lists for `--permission-mode`
+/// (`manual` is what older versions called `default`).
+const PERMISSION_MODES: &[&str] = &["manual", "acceptEdits", "plan", "bypassPermissions"];
 const PROMPT_MAX: usize = 200_000;
 const STDERR_TAIL: usize = 2_000;
 
@@ -38,7 +40,7 @@ pub struct ChatRequest {
     /// Model alias or id (`opus`, `sonnet`, `haiku`, `claude-…`); none = the CLI's default.
     #[serde(default)]
     pub model: Option<String>,
-    /// `default` | `acceptEdits` | `plan` | `bypassPermissions`; none = the CLI's default.
+    /// `manual` | `acceptEdits` | `plan` | `bypassPermissions`; none = the CLI's default.
     #[serde(default)]
     pub permission_mode: Option<String>,
 }
@@ -250,6 +252,7 @@ mod tests {
         assert!(bad(|r| r.session_id = Some("--dangerously-skip-permissions".into())), "an id cannot smuggle a flag");
         assert!(bad(|r| r.model = Some("opus --add-dir C:\\".into())));
         assert!(bad(|r| r.permission_mode = Some("yolo".into())));
+        assert!(bad(|r| r.permission_mode = Some("default".into())), "not a mode of the current CLI");
         let empty = ChatRequest { session_id: Some(String::new()), model: Some(String::new()), permission_mode: Some(String::new()), ..request(dir.path()) };
         assert_eq!(turn_args(&empty).unwrap(), base, "empty options are left to the CLI");
     }

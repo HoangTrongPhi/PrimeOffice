@@ -1,8 +1,9 @@
 # PrimeOffice — Progress
 
 ## Status
-- Current phase: 0.2.0 released 2026-11-10 (sub-agents, departments, Game studio floor plan); files in
-  `release/0.2.0`; the user commits, pushes and publishes GitHub releases themself
+- Current phase: 0.3.0 built 2026-11-11 on the user's request (Chat, Studios + Video studio, Codex sessions); files
+  in `release/0.3.0`; not published. 0.2.0 was released 2026-11-10. The user commits, pushes and publishes GitHub
+  releases themself
 - Last session: 2026-11-09 — app built from the template: Rust observer + providers + project check + CLI,
   vendored pixel-agents office in an iframe, Projects / History / Agents modules, generated character crew
 - `npm run check`: green (35 Rust tests, typecheck, 19/19 commands mocked); `npm run build` green
@@ -41,6 +42,15 @@
   session and kept its context). Not yet tried in the real window. Limits: Claude Code only; a turn cannot ask
   for permission (refused calls are reported); a continued session shows only its last exchange; one
   conversation at a time; Claude Desktop needs `/resume` to open a Chat session (not in its sidebar).
+- [ ] M3c Permission prompts in Chat — started 2026-11-11, paused by the user until their plan's usage resets (the
+  5-hour window was at 91%). Found so far on Claude Code 2.1.319: `--permission-mode` now takes `manual` (not
+  `default`) — fixed in Chat; `--permission-prompts host|none` says who answers prompts under `--print` ("host" =
+  the SDK host or `--permission-prompt-tool`). One probe with `--input-format stream-json` and an auto-allowed
+  `echo` showed no request; a second probe (a `Write` in `manual` mode with `--permission-prompt-tool stdio`) was
+  interrupted — the file was written, but whether a `control_request` / `can_use_tool` came first is not known.
+  Next: rerun that probe (scratch script `perm_probe2.py` is gone with the session; it sends one user record on
+  stdin and answers `control_request` with a `control_response` allow), then keep stdin open per turn in
+  `spawn_turn`, emit the request as a chat item with Allow / Deny, and write the answer back.
 - [x] Studios (2026-11-11, asked by the user: "each tab a company for one field, its own skill set later") — tab
   strip in Office, `studio_cmd.rs` (`studios.json`, `layout-<id>.json`), kinds in `src/lib/studios.ts`, Video
   studio plan (`gen-studio-layout.py` now builds every plan; game-studio.json unchanged byte for byte) and video

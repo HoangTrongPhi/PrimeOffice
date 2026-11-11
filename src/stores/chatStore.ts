@@ -19,7 +19,7 @@ export const CHAT_MODELS: { id: string; label: string }[] = [
 export const CHAT_MODES: { id: string; label: string; text: string }[] = [
   { id: "acceptEdits", label: "Edit files", text: "Reads and edits files in the folder. Commands run only when the project's Claude Code settings allow them." },
   { id: "plan", label: "Plan only", text: "Reads and proposes a plan; changes nothing." },
-  { id: "default", label: "Ask first", text: "Only what your Claude Code settings already allow; everything else is refused." },
+  { id: "manual", label: "Ask first", text: "Only what your Claude Code settings already allow; everything else is refused." },
   { id: "bypassPermissions", label: "Full auto", text: "No permission checks at all: any command, any file. Use only in a folder you can afford to lose." },
 ];
 
@@ -114,7 +114,9 @@ export const useChatStore = create<ChatState>()(
         if (!inTauri || !cwd || !text || running !== null) return;
         set({ view: { ...view, items: [...view.items, { kind: "user", text }] }, title: get().title || text.slice(0, 60), stopping: false });
         try {
-          const chatId = await ipc.chatSend({ cwd, prompt: text, sessionId: view.sessionId, model: model || null, permissionMode: mode || null });
+          // A mode saved by an older version may no longer exist.
+          const permissionMode = CHAT_MODES.some((m) => m.id === mode) ? mode : CHAT_MODES[0].id;
+          const chatId = await ipc.chatSend({ cwd, prompt: text, sessionId: view.sessionId, model: model || null, permissionMode });
           set({ running: chatId });
         } catch (e) {
           const v = get().view;

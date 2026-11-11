@@ -162,7 +162,7 @@ fn chat_refuses_bad_requests_before_starting_anything() {
     assert!(h.invoke("chat_send", json!({ "request": { "cwd": "Z:\\no\\such\\folder", "prompt": "hi" } })).is_err());
     let dir = project_tree();
     assert!(h.invoke("chat_send", json!({ "request": { "cwd": s(dir.path()), "prompt": "   " } })).is_err());
-    assert!(h.invoke("chat_send", json!({ "request": { "cwd": s(dir.path()), "prompt": "hi", "sessionId": "--flag", "model": null, "permissionMode": null } })).is_err());
+    assert!(h.invoke("chat_send", json!({ "request": { "cwd": s(dir.path()), "prompt": "hi", "sessionId": "--flag", "model": null, "permissionMode": "manual" } })).is_err());
     assert_eq!(h.ok("chat_stop", json!({ "chatId": 999 })), false);
 }
 

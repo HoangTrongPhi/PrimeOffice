@@ -1,7 +1,7 @@
 {
   "name": "primeoffice",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "PrimeOffice — Pixel office for your AI coding agents",
   "type": "module",
   "scripts": {

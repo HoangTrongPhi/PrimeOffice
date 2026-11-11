@@ -4,6 +4,8 @@ All user-visible changes. Newest first; one section per released version.
 
 ## Unreleased
 
+## 0.3.0 — 2026-11-11
+
 - **Chat** (new tab, Ctrl+2): give an agent work from PrimeOffice. Each conversation is an ordinary Claude Code
   session, run by the `claude` CLI on your PC with your own sign-in: pick a folder, write the task, watch the reply
   and the tools; continue any session of the folder (also ones from a terminal or Claude Desktop), or open a Chat

@@ -166,7 +166,7 @@ export interface ChatRequest {
   sessionId: string | null;
   /** Model alias or id; null = the CLI's default. */
   model: string | null;
-  /** `default` | `acceptEdits` | `plan` | `bypassPermissions`; null = the CLI's default. */
+  /** `manual` | `acceptEdits` | `plan` | `bypassPermissions`; null = the CLI's default. */
   permissionMode: string | null;
 }
 
