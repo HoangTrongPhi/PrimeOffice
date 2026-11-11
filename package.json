@@ -13,7 +13,7 @@
     "tauri": "tauri",
     "release": "powershell -ExecutionPolicy Bypass -File \"../Abyss/scripts/release.ps1\" -App .",
     "check:mock": "node scripts/check-mock.mjs",
-    "test:ts": "node --test scripts/tests/departments.test.ts",
+    "test:ts": "node --test scripts/tests/departments.test.ts scripts/tests/chatEvents.test.ts",
     "test": "cargo test --manifest-path src-tauri/Cargo.toml",
     "check": "npm run typecheck && npm run check:mock && npm run test:ts && npm run test"
   },

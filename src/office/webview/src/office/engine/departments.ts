@@ -89,6 +89,44 @@ export const DEPARTMENTS: Department[] = [
     ],
     agents: ['localization-lead', 'community-manager'],
   },
+
+  // ---- Video studio (YouTube / video production). The agent types are placeholders until the
+  // studio's skill set is chosen: rename them here, the Areas of video-studio.json stay as they are.
+  {
+    id: 'producers',
+    aliases: ['producers', 'production', 'showrunners', 'ban san xuat', 'san xuat'],
+    agents: ['showrunner', 'executive-producer', 'channel-strategist', 'content-strategist'],
+  },
+  {
+    id: 'script',
+    aliases: ['script', 'scripts', 'script room', 'scripting', 'research', 'kich ban'],
+    agents: ['scriptwriter', 'script-writer', 'researcher', 'fact-checker', 'hook-writer', 'storyboard-artist'],
+  },
+  {
+    id: 'editing',
+    aliases: ['editing', 'editing bay', 'edit bay', 'edit', 'post production', 'dung phim', 'hau ky'],
+    agents: ['video-editor', 'assistant-editor', 'shorts-editor', 'colorist', 'subtitle-editor'],
+  },
+  {
+    id: 'motion',
+    aliases: ['motion', 'motion graphics', 'motion and graphics', 'graphics', 'thumbnails', 'do hoa'],
+    agents: ['motion-designer', 'thumbnail-designer', 'graphic-designer', 'vfx-artist'],
+  },
+  {
+    id: 'voice',
+    aliases: ['audio booth', 'voice', 'voice over', 'voice booth', 'audio', 'sound', 'thu am', 'am thanh'],
+    agents: ['voice-over-artist', 'audio-engineer', 'music-supervisor', 'podcast-editor'],
+  },
+  {
+    id: 'publishing',
+    aliases: ['publishing', 'publishing seo', 'publishing and seo', 'seo', 'distribution', 'xuat ban', 'dang tai'],
+    agents: ['seo-specialist', 'title-writer', 'publisher', 'upload-manager', 'comment-moderator'],
+  },
+  {
+    id: 'analytics',
+    aliases: ['analytics', 'data', 'insights', 'phan tich'],
+    agents: ['analytics-analyst', 'retention-analyst', 'growth-analyst'],
+  },
 ];
 
 const ENGINE_PREFIXES = ['ue-', 'unity-', 'godot-'];
@@ -167,9 +205,13 @@ export function venueAreas(venue: Venue, areaLabels: string[]): string[] {
   return areaLabels.filter((l) => wanted.has(normalizeLabel(l)));
 }
 
+/** Departments whose members gather in the meeting room (a studio's leadership). */
+const LEADERSHIP = ['directors', 'producers'];
+
 /** Directors (tier 1): they gather in the meeting room. */
 export function isDirector(agentType: string | undefined): boolean {
-  return departmentOf(agentType)?.id === 'directors';
+  const id = departmentOf(agentType)?.id;
+  return id !== undefined && LEADERSHIP.includes(id);
 }
 
 /**

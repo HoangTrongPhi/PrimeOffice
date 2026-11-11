@@ -9,7 +9,7 @@
  */
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { AgentSession, OfficeMessage, ProjectCheck, ProjectReport, ProviderStatus } from "../types/primeoffice";
+import type { AgentSession, OfficeMessage, ProjectCheck, ProjectReport, ProviderStatus, Studios } from "../types/primeoffice";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const GAME = "D:\\Projects\\StarHarbor";
@@ -163,11 +163,56 @@ function savePrefs(p: MockOfficePrefs) {
 }
 let prefs = loadPrefs();
 
-/** The layout saved by the office (layout.json in the real backend); null = the bundled default. */
+// ---------------------------------------------------------------- chat (chat_cmd): a played-back turn
+
+let chatSeq = 0;
+const chatTimers = new Map<number, ReturnType<typeof setTimeout>[]>();
+
+/** Emit the stream-json records of one Claude Code turn: text streams in, a file is edited, the result. */
+function playChatTurn(chatId: number, sessionId: string, model: string, prompt: string) {
+  const reply = `On it: "${prompt.slice(0, 60)}". I read the inventory grid, fixed the off-by-one in the slot index and the tests pass.`;
+  const words = reply.split(" ");
+  const base = { session_id: sessionId, parent_tool_use_id: null };
+  const steps: [number, unknown][] = [
+    [300, { type: "system", subtype: "init", model, cwd: GAME, ...base }],
+    [700, { type: "assistant", message: { content: [{ type: "tool_use", id: `t-${chatId}-1`, name: "Read", input: { file_path: `${GAME}\\src\\InventoryGrid.tsx` } }] }, ...base }],
+    [1300, { type: "user", message: { content: [{ type: "tool_result", tool_use_id: `t-${chatId}-1`, content: "…" }] }, ...base }],
+    [1500, { type: "assistant", message: { content: [{ type: "tool_use", id: `t-${chatId}-2`, name: "Edit", input: { file_path: `${GAME}\\src\\InventoryGrid.tsx` } }] }, ...base }],
+    [2300, { type: "user", message: { content: [{ type: "tool_result", tool_use_id: `t-${chatId}-2`, content: "ok" }] }, ...base }],
+  ];
+  words.forEach((w, i) => steps.push([2500 + i * 70, { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: (i ? " " : "") + w } }, ...base }]));
+  const end = 2600 + words.length * 70;
+  steps.push([end, { type: "assistant", message: { content: [{ type: "text", text: reply }] }, ...base }]);
+  steps.push([end + 100, { type: "result", subtype: "success", is_error: false, result: reply, total_cost_usd: 0.0183, permission_denials: [], ...base }]);
+  const timers = steps.map(([ms, line]) => setTimeout(() => void emit("chat://event", { chatId, line }), ms));
+  timers.push(
+    setTimeout(() => {
+      chatTimers.delete(chatId);
+      void emit("chat://event", { chatId, done: { code: 0, stderr: "" } });
+    }, end + 200),
+  );
+  chatTimers.set(chatId, timers);
+}
+
+/** Studios (studios.json in the real backend). */
+const STUDIOS_KEY = "primeoffice.mock-studios";
+const DEFAULT_STUDIOS: Studios = { active: "main", studios: [{ id: "main", name: "Game studio", kind: "game", projects: [] }] };
+function loadStudios(): Studios {
+  try {
+    const s = JSON.parse(localStorage.getItem(STUDIOS_KEY) ?? "null") as Studios | null;
+    return s && Array.isArray(s.studios) && s.studios.length ? s : DEFAULT_STUDIOS;
+  } catch {
+    return DEFAULT_STUDIOS;
+  }
+}
+let studios = loadStudios();
+
+/** The layout a studio saved (layout.json / layout-<id>.json in the real backend); null = its kind's floor plan. */
 const LAYOUT_KEY = "primeoffice.mock-layout";
+const layoutKey = (studio: string) => (studio === "main" ? LAYOUT_KEY : `${LAYOUT_KEY}-${studio}`);
 function mockLayout(): unknown {
   try {
-    return JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "null");
+    return JSON.parse(localStorage.getItem(layoutKey(studios.active)) ?? "null");
   } catch {
     return null;
   }
@@ -319,7 +364,7 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
           switch (m.type) {
             case "saveLayout":
               try {
-                localStorage.setItem(LAYOUT_KEY, JSON.stringify(m.layout));
+                localStorage.setItem(layoutKey(typeof m.studio === "string" ? m.studio : studios.active), JSON.stringify(m.layout));
               } catch {
                 // not kept; fine for the mock
               }
@@ -388,6 +433,40 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
         }
         case "list_providers":
           return PROVIDERS;
+
+        case "chat_cli":
+          return { found: true, path: "C:\\Users\\me\\.local\\bin\\claude.exe", hint: "Install Claude Code, run `claude` once in a terminal and sign in there." };
+        case "chat_send": {
+          const req = (a.request ?? {}) as { prompt?: string; sessionId?: string | null; model?: string | null };
+          if (!req.prompt?.trim()) throw "The message is empty";
+          const chatId = ++chatSeq;
+          playChatTurn(chatId, req.sessionId || "0c1d2e3f-aaaa-4bbb-8ccc-0123456789ab", req.model || "claude-opus-5-5", req.prompt);
+          return chatId;
+        }
+        case "chat_stop": {
+          const live = chatTimers.get(a.chatId);
+          if (!live) return false;
+          live.forEach(clearTimeout);
+          chatTimers.delete(a.chatId);
+          void emit("chat://event", { chatId: a.chatId, done: { code: null, stderr: "" } });
+          return true;
+        }
+
+        case "list_studios":
+          return studios;
+        case "save_studios": {
+          const next = a.studios as Studios;
+          if (!next?.studios?.length) throw "At least one studio is needed";
+          if (next.studios.some((s) => !s.name.trim())) throw "A studio needs a name";
+          for (const gone of studios.studios.filter((s) => !next.studios.some((n) => n.id === s.id))) localStorage.removeItem(layoutKey(gone.id));
+          studios = { active: next.studios.some((s) => s.id === next.active) ? next.active : next.studios[0].id, studios: next.studios.map((s) => ({ ...s, name: s.name.trim() })) };
+          try {
+            localStorage.setItem(STUDIOS_KEY, JSON.stringify(studios));
+          } catch {
+            // not kept; fine for the mock
+          }
+          return studios;
+        }
 
         case "plugin:dialog|open":
           return a.options?.directory ? "D:\\Projects\\NewPrototype" : null;

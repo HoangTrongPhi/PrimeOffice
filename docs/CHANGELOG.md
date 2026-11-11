@@ -4,6 +4,19 @@ All user-visible changes. Newest first; one section per released version.
 
 ## Unreleased
 
+- **Chat** (new tab, Ctrl+2): give an agent work from PrimeOffice. Each conversation is an ordinary Claude Code
+  session, run by the `claude` CLI on your PC with your own sign-in: pick a folder, write the task, watch the reply
+  and the tools; continue any session of the folder (also ones from a terminal or Claude Desktop), or open a Chat
+  session elsewhere with `claude --resume` / Desktop's `/resume`. Projects, History and Agents are now Ctrl+3…5.
+
+- **Studios**: the Office tab has a tab strip of studios. Each studio is a company of its own — its floor, its
+  departments and its project folders. **+** creates one from a kind (Game studio, Video studio, Classic office);
+  **Studio…** renames it, picks its folders or deletes it. The office you had is the first studio.
+- **Video studio**: a floor plan for YouTube / video production (Ban sản xuất, meeting room, Publishing & SEO, Script
+  room, Studio head, Editing bay, Motion & graphics, Lounge, Audio booth, Analytics) with its departments.
+- **Codex CLI sessions** join the office and History (read from `~/.codex/sessions`).
+- A new install starts with the Game studio floor instead of the classic two-room office.
+
 ## 0.2.0 — 2026-11-10
 
 - **Sub-agents in the office**: every `Agent` / `Task` call gets its own character, fed from its own transcript

@@ -34,6 +34,21 @@ test("the studio floor plan has an area for every department", () => {
   }
 });
 
+test("the video studio floor plan has an area for every video department", () => {
+  const layout = JSON.parse(readFileSync(new URL("../../public/assets/layouts/video-studio.json", import.meta.url), "utf8"));
+  const labels = layout.areas.map((a: { label: string }) => a.label);
+  const seats: Record<string, string> = { showrunner: "Ban sản xuất", scriptwriter: "Script room", "video-editor": "Editing bay", "thumbnail-designer": "Motion & graphics", "voice-over-artist": "Audio booth", "seo-specialist": "Publishing & SEO", "retention-analyst": "Analytics" };
+  for (const [agent, area] of Object.entries(seats)) assert.deepEqual(areaTiersFor(agent, labels, {}), [[area]], agent);
+  assert.equal(venueAreas("meeting", labels).length, 1);
+  assert.equal(venueAreas("lounge", labels).length, 1);
+  assert.ok(isDirector("showrunner"), "video leadership meets in the meeting room");
+  // A game agent has no desk here, a video agent none in the game studio: they stay at Studio head.
+  assert.deepEqual(areaTiersFor("gameplay-programmer", labels, {}), []);
+  const game = JSON.parse(readFileSync(new URL("../../public/assets/layouts/game-studio.json", import.meta.url), "utf8")).areas.map((a: { label: string }) => a.label);
+  assert.deepEqual(areaTiersFor("video-editor", game, {}), []);
+  assert.deepEqual(areaTiersFor("sound-designer", game, {}), [["Audio"]], "game audio keeps its room");
+});
+
 test("sub-agent labels", () => {
   assert.equal(subagentLabel("qa-lead", "Review"), "qa-lead · Review");
   assert.equal(subagentLabel("general-purpose", "Review"), "Review");

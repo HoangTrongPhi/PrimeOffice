@@ -3,7 +3,7 @@ import type { AbyssContext } from "@abyss/ui";
 
 export type { LogEntry, LogLevel } from "@abyss/ui";
 
-export type TabId = "office" | "projects" | "history" | "providers";
+export type TabId = "office" | "chat" | "projects" | "history" | "providers";
 
 export interface AppInfo {
   version: string;
@@ -137,6 +137,51 @@ export interface OfficeSnapshot {
 export interface OfficeAgent {
   id: number;
   session: AgentSession;
+}
+
+/** `studio_cmd::Studio`: one company in the Office tab, with its own floor and folders. */
+export interface Studio {
+  /** `[a-z0-9-]`, unique. */
+  id: string;
+  name: string;
+  /** A `STUDIO_KINDS` id (lib/studios.ts): the floor plan and departments it starts from. */
+  kind: string;
+  /** Project folders whose agents work here; empty = every project. */
+  projects: string[];
+}
+
+/** `studio_cmd::Studios`. */
+export interface Studios {
+  active: string;
+  studios: Studio[];
+}
+
+// ---------------------------------------------------------------- chat (commands::chat_cmd)
+
+/** `chat_cmd::ChatRequest`: one message to an agent. */
+export interface ChatRequest {
+  cwd: string;
+  prompt: string;
+  /** Session to continue; null starts a new one. */
+  sessionId: string | null;
+  /** Model alias or id; null = the CLI's default. */
+  model: string | null;
+  /** `default` | `acceptEdits` | `plan` | `bypassPermissions`; null = the CLI's default. */
+  permissionMode: string | null;
+}
+
+/** Payload of `chat://event`: a stream-json record of the CLI, or the end of its process. */
+export interface ChatEvent {
+  chatId: number;
+  line?: unknown;
+  done?: { code: number | null; stderr: string };
+}
+
+/** `chat_cmd::ChatCli`. */
+export interface ChatCli {
+  found: boolean;
+  path: string | null;
+  hint: string;
 }
 
 /** `office_cmd::OfficeFilter`. */

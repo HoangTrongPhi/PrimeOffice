@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { registerDropHandler } from "../lib/dropRouter";
 import { inTauri, ipc } from "../lib/ipc";
-import type { AgentSession, OfficeAgent, ProjectReport, ProviderStatus } from "../types/primeoffice";
+import { kindOf, newStudioId, studioHasProject } from "../lib/studios";
+import type { AgentSession, OfficeAgent, ProjectReport, ProviderStatus, Studio, Studios } from "../types/primeoffice";
 import { errorText, uiLog, useAppStore } from "./appStore";
 
 // ---------------------------------------------------------------- office
@@ -53,12 +54,84 @@ export const useOfficeStore = create<OfficeState>()(
       applyFilter: async () => {
         if (!inTauri) return;
         const { project, windowMinutes } = get();
-        await ipc.officeSetFilter({ projects: project ? [project] : [], windowMinutes }).catch((e) => uiLog("error", `Office filter: ${errorText(e)}`));
+        // One project when picked, else the folders of the studio on screen (none = every project).
+        const projects = project ? [project] : (currentStudio()?.projects ?? []);
+        await ipc.officeSetFilter({ projects, windowMinutes }).catch((e) => uiLog("error", `Office filter: ${errorText(e)}`));
       },
     }),
     { name: "primeoffice.office", partialize: (s) => ({ project: s.project, windowMinutes: s.windowMinutes, pack: s.pack }) },
   ),
 );
+
+// ---------------------------------------------------------------- studios
+
+interface StudioState extends Studios {
+  loaded: boolean;
+  load: () => Promise<void>;
+  /** Save a new list; false when the backend refused it (the list on screen is kept). */
+  save: (next: Studios) => Promise<boolean>;
+  setActive: (id: string) => Promise<boolean>;
+  add: (kind: string, name: string) => Promise<boolean>;
+  update: (id: string, patch: Partial<Pick<Studio, "name" | "projects">>) => Promise<boolean>;
+  remove: (id: string) => Promise<boolean>;
+}
+
+/** The studio the office shows, null until the list is loaded. */
+export function currentStudio(): Studio | null {
+  const { studios, active } = useStudioStore.getState();
+  return studios.find((s) => s.id === active) ?? studios[0] ?? null;
+}
+
+export const useStudioStore = create<StudioState>()((set, get) => ({
+  active: "",
+  studios: [],
+  loaded: false,
+  load: async () => {
+    if (!inTauri) return;
+    try {
+      const { active, studios } = await ipc.listStudios();
+      set({ active, studios, loaded: true });
+    } catch (e) {
+      uiLog("error", `Studios: ${errorText(e)}`);
+    }
+  },
+  save: async (next) => {
+    if (!inTauri) return false;
+    try {
+      const { active, studios } = await ipc.saveStudios(next);
+      set({ active, studios, loaded: true });
+      // The office shows this studio's folders: a project picked in another studio no longer applies.
+      const office = useOfficeStore.getState();
+      if (office.project && !studioHasProject(currentStudio(), office.project)) office.setProject(null);
+      else void office.applyFilter();
+      return true;
+    } catch (e) {
+      uiLog("error", `Studios: ${errorText(e)}`);
+      return false;
+    }
+  },
+  setActive: async (id) => {
+    const { active, studios } = get();
+    if (id === active) return true;
+    useOfficeStore.getState().select(null);
+    return get().save({ active: id, studios });
+  },
+  add: (kind, name) => {
+    const { studios } = get();
+    const id = newStudioId(kind, studios);
+    return get().save({ active: id, studios: [...studios, { id, name: name.trim() || kindOf(kind).label, kind, projects: [] }] });
+  },
+  update: (id, patch) => {
+    const { active, studios } = get();
+    return get().save({ active, studios: studios.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
+  },
+  remove: (id) => {
+    const { active, studios } = get();
+    const rest = studios.filter((s) => s.id !== id);
+    if (rest.length === 0) return Promise.resolve(false);
+    return get().save({ active: active === id ? rest[0].id : active, studios: rest });
+  },
+}));
 
 // ---------------------------------------------------------------- projects
 

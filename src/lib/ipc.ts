@@ -4,6 +4,9 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AgentSession,
   AppInfo,
+  ChatCli,
+  ChatEvent,
+  ChatRequest,
   LogEntry,
   OfficeAgent,
   OfficeFilter,
@@ -12,6 +15,7 @@ import type {
   ProjectReport,
   ProviderStatus,
   SessionQuery,
+  Studios,
 } from "../types/primeoffice";
 
 /** False in a plain browser (`npm run dev` without `?mock`): backend calls are skipped. */
@@ -20,6 +24,7 @@ export const inTauri = isTauri();
 export const EVENTS = {
   log: "log://entry",
   office: "office://message",
+  chat: "chat://event",
 } as const;
 
 export const ipc = {
@@ -46,10 +51,22 @@ export const ipc = {
   listSessions: (query: SessionQuery) => invoke<AgentSession[]>("list_sessions", { query }),
   getSession: (path: string) => invoke<AgentSession>("get_session", { path }),
   listProviders: () => invoke<ProviderStatus[]>("list_providers"),
+
+  listStudios: () => invoke<Studios>("list_studios"),
+  /** Replace the studio list (add, rename, remove, folders, switch); answers the list as saved. */
+  saveStudios: (studios: Studios) => invoke<Studios>("save_studios", { studios }),
+
+  /** Is the Claude Code CLI installed. */
+  chatCli: () => invoke<ChatCli>("chat_cli"),
+  /** One message to an agent; answers the chat id its `chat://event`s carry. */
+  chatSend: (request: ChatRequest) => invoke<number>("chat_send", { request }),
+  chatStop: (chatId: number) => invoke<boolean>("chat_stop", { chatId }),
 };
 
 export const on = {
   log: (cb: (e: LogEntry) => void): Promise<UnlistenFn> => listen<LogEntry>(EVENTS.log, (e) => cb(e.payload)),
   /** Batches of pixel-agents ServerMessages from the observer. */
   office: (cb: (msgs: OfficeMessage[]) => void): Promise<UnlistenFn> => listen<OfficeMessage[]>(EVENTS.office, (e) => cb(e.payload)),
+  /** Records of a running chat turn, then its end. */
+  chat: (cb: (e: ChatEvent) => void): Promise<UnlistenFn> => listen<ChatEvent>(EVENTS.chat, (e) => cb(e.payload)),
 };

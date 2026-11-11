@@ -32,7 +32,21 @@
   character in the office window — no live Codex session at the time) [ ] Gemini CLI (not installed on this PC)
   [ ] Antigravity (`~/.gemini/antigravity/conversations`, protobuf/SQLite, not read)
 - [ ] Munder Difflin integration — plan and ToS boundary in `docs/INTEGRATION_PLAN.md` (M1 = P6, M2 usage limits,
-  M3+ launching agents needs the user's go-ahead: it ends "observe only")
+  M3 launching agents: approved by the user 2026-11-11, which ends "observe only"; steps M3a–M3f in the plan)
+- [x] M3a Chat (2026-11-11, asked by the user: "a chatbox to give work, one session per conversation, like using
+  Fork instead of GitHub Desktop") — `chat_cmd.rs` runs `claude -p --output-format stream-json` per message
+  (`--resume` to continue), `chat://event` → `src/lib/chatEvents.ts` → `ChatTab` (Ctrl+2; the other tabs moved to
+  Ctrl+3…5). Checked: 4 Rust tests + 4 node tests; `?mock` (send, tools, streamed reply, session list); the real
+  CLI 2.1.319 through `spawn_turn` (`cargo test real_cli -- --ignored`: second turn resumed the first one's
+  session and kept its context). Not yet tried in the real window. Limits: Claude Code only; a turn cannot ask
+  for permission (refused calls are reported); a continued session shows only its last exchange; one
+  conversation at a time; Claude Desktop needs `/resume` to open a Chat session (not in its sidebar).
+- [x] Studios (2026-11-11, asked by the user: "each tab a company for one field, its own skill set later") — tab
+  strip in Office, `studio_cmd.rs` (`studios.json`, `layout-<id>.json`), kinds in `src/lib/studios.ts`, Video
+  studio plan (`gen-studio-layout.py` now builds every plan; game-studio.json unchanged byte for byte) and video
+  departments in `departments.ts`. Seen in `?mock`: create a Video studio, its floor loads, switch back, Studio…
+  dialog; no console errors. Not yet in the real window. Open: per-studio skill sets (the user picks them later;
+  the video agent types are placeholders), area mappings and seats are still shared by all studios.
 - [ ] P7 Optional Claude hooks via `primeoffice.exe hook` (exact permission bubbles)
 
 ## Decisions (answers to the spec's open questions)

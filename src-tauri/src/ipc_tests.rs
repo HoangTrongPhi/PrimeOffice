@@ -142,6 +142,31 @@ fn office_snapshot_and_messages() {
 }
 
 #[test]
+fn studios_start_with_one_and_reject_bad_lists() {
+    let h = Harness::new();
+    let studios = h.ok("list_studios", json!({}));
+    assert_eq!(studios["active"], studios["studios"][0]["id"]);
+    assert!(!studios["studios"].as_array().unwrap().is_empty());
+    // Saving the same list writes nothing; a bad list is refused before anything is written.
+    assert_eq!(h.ok("save_studios", json!({ "studios": studios })), studios);
+    assert!(h.invoke("save_studios", json!({ "studios": { "active": "x", "studios": [] } })).is_err());
+    assert!(h.invoke("save_studios", json!({ "studios": { "active": "a", "studios": [{ "id": "../a", "name": "A", "kind": "video" }] } })).is_err());
+}
+
+#[test]
+fn chat_refuses_bad_requests_before_starting_anything() {
+    let h = Harness::new();
+    let cli = h.ok("chat_cli", json!({}));
+    assert!(cli["found"].is_boolean() && !cli["hint"].as_str().unwrap().is_empty());
+    // The JSON the chat store sends; none of these reaches the CLI.
+    assert!(h.invoke("chat_send", json!({ "request": { "cwd": "Z:\\no\\such\\folder", "prompt": "hi" } })).is_err());
+    let dir = project_tree();
+    assert!(h.invoke("chat_send", json!({ "request": { "cwd": s(dir.path()), "prompt": "   " } })).is_err());
+    assert!(h.invoke("chat_send", json!({ "request": { "cwd": s(dir.path()), "prompt": "hi", "sessionId": "--flag", "model": null, "permissionMode": null } })).is_err());
+    assert_eq!(h.ok("chat_stop", json!({ "chatId": 999 })), false);
+}
+
+#[test]
 fn providers_and_sessions() {
     let h = Harness::new();
     let providers = h.ok("list_providers", json!({}));

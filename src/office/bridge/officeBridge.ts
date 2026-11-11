@@ -25,6 +25,27 @@ function assetsFor(pack: string) {
   return p;
 }
 
+/** A studio kind's floor plan (public/assets), used until the studio has a saved layout. */
+const planCache = new Map<string, Promise<unknown>>();
+function floorPlan(file: string): Promise<unknown> {
+  let p = planCache.get(file);
+  if (!p) {
+    p = fetch(`${import.meta.env.BASE_URL}assets/${file}`).then((r) => {
+      if (!r.ok) throw new Error(`${file}: ${r.status}`);
+      return r.json() as Promise<unknown>;
+    });
+    p.catch(() => planCache.delete(file));
+    planCache.set(file, p);
+  }
+  return p;
+}
+
+/** The studio a frame shows: its id (layouts are saved per studio) and its kind's floor plan. */
+export interface OfficeStudio {
+  id: string;
+  planFile: string;
+}
+
 export interface OfficeBridgeEvents {
   /** A character was clicked (pixel-agents' focusAgent). */
   onFocusAgent: (id: number) => void;
@@ -33,7 +54,7 @@ export interface OfficeBridgeEvents {
 }
 
 /** Wire one office frame; returns the disconnect function. */
-export function connectOfficeFrame(frame: HTMLIFrameElement, pack: string, events: OfficeBridgeEvents): () => void {
+export function connectOfficeFrame(frame: HTMLIFrameElement, pack: string, studio: OfficeStudio, events: OfficeBridgeEvents): () => void {
   let booted = false;
   let disposed = false;
   const post = (m: unknown) => frame.contentWindow?.postMessage(m, "*");
@@ -51,6 +72,8 @@ export function connectOfficeFrame(frame: HTMLIFrameElement, pack: string, event
     booted = false;
     try {
       const [assets, snap] = await Promise.all([assetsFor(pack), inTauri ? ipc.officeSnapshot() : Promise.resolve(null)]);
+      // No saved layout yet: the studio starts from its kind's floor plan.
+      const layout = snap?.layout ?? (await floorPlan(studio.planFile).catch(() => assets.defaultLayout));
       if (disposed) return;
       post({ type: "providerCapabilities", readingTools: READING_TOOLS, subagentToolNames: SUBAGENT_TOOLS });
       if (snap) {
@@ -59,7 +82,7 @@ export function connectOfficeFrame(frame: HTMLIFrameElement, pack: string, event
       }
       assets.messages.forEach(post);
       post(snap?.existing ?? { type: "existingAgents", agents: [], agentMeta: {}, directoryNames: {}, externalAgents: {} });
-      post({ type: "layoutLoaded", layout: snap?.layout ?? assets.defaultLayout });
+      post({ type: "layoutLoaded", layout });
       snap?.activity.forEach(post);
       booted = true;
       events.onAgentsChanged();
@@ -83,6 +106,9 @@ export function connectOfficeFrame(frame: HTMLIFrameElement, pack: string, event
       // Saved by the backend (office_cmd::office_send): the layout, the office's own settings,
       // seats and folder areas come back on the next load; × hides an agent until it works again.
       case "saveLayout":
+        // Saved for the studio this frame shows, even if another one was opened meanwhile.
+        if (inTauri) ipc.officeSend({ ...m, studio: studio.id }).catch((err) => uiLog("error", `Office: ${errorText(err)}`));
+        break;
       case "exportLayout":
       case "importLayout":
       case "closeAgent":

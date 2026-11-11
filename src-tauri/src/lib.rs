@@ -20,6 +20,7 @@ fn configure<R: Runtime>(builder: Builder<R>, open_with: Option<Result<std::path
         .manage(LogBus::default())
         .manage(JobRegistry::default())
         .manage(commands::office_cmd::OfficeState::default())
+        .manage(commands::chat_cmd::ChatState::default())
         .manage(commands::app_cmd::StartupFolder::new(startup_folder))
         .setup(move |app| {
             logbus::emit(
@@ -56,6 +57,11 @@ fn configure<R: Runtime>(builder: Builder<R>, open_with: Option<Result<std::path
             commands::session_cmd::list_sessions,
             commands::session_cmd::get_session,
             commands::session_cmd::list_providers,
+            commands::studio_cmd::list_studios,
+            commands::studio_cmd::save_studios,
+            commands::chat_cmd::chat_cli,
+            commands::chat_cmd::chat_send,
+            commands::chat_cmd::chat_stop,
         ])
 }
 

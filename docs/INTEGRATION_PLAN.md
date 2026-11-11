@@ -20,8 +20,20 @@ gói nào còn hạn mức, và (từ M3) mở agent đúng CLI cho từng việ
 | Một tài khoản mỗi hãng; hết hạn mức thì chuyển việc sang **hãng khác** | Đặt proxy giữa CLI và máy chủ của hãng (tầng `proxy` của Munder Difflin) |
 | Giao việc giữa các agent bằng chế độ không tương tác **có trong tài liệu** của CLI (`codex exec`, `claude -p`, `gemini -p`) | `hiddenClaude.ts`: phiên Claude ẩn gõ tự động vào TUI để lấy hạn mức gói tương tác thay cho hạn mức Agent SDK |
 
-Chưa kiểm chứng được từ đây: điều khoản hiện hành của từng hãng về việc tự động hoá CLI. Trước M4 phải đọc lại
-trang chính thức của Anthropic, OpenAI và Google; nếu một hãng không cho, bước đó bỏ hãng ấy.
+Anthropic — tra ngày 2026-11-11 (kết quả tìm kiếm, chưa đọc nguyên văn từng trang):
+- [Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance): đăng nhập OAuth dành cho người mua
+  gói, để dùng Claude Code bình thường; nhà phát triển bên thứ ba không được đưa đăng nhập Claude.ai vào app của họ
+  hay chuyển request qua credential gói tiêu dùng cho người dùng của họ; không sửa binary Claude Code.
+- [Use the Claude Agent SDK with your Claude plan](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan):
+  khi đăng nhập bằng gói, Agent SDK và `claude -p` tính vào hạn mức gói (thay đổi tách hạn mức đã tạm dừng 6/2026).
+- [Headless mode](https://code.claude.com/docs/en/headless.md): `claude -p` là chế độ có trong tài liệu.
+
+Cách PrimeOffice đứng trong ranh giới đó (đây là cách tôi đọc, không phải xác nhận của Anthropic): app không có màn
+hình đăng nhập, không giữ credential, không gọi máy chủ Anthropic; nó chạy binary `claude` nguyên bản mà người dùng
+tự cài và tự đăng nhập, trên máy của chính họ, khi họ gửi tin nhắn. Nếu sau này PrimeOffice phát hành cho người khác
+với Chat bật sẵn, nên đọc lại nguyên văn trang Legal trước khi phát hành.
+
+OpenAI và Google: chưa tra. Phải tra trước khi Chat chạy Codex / Gemini; nếu một hãng không cho, bỏ hãng ấy.
 
 ## 3. Lấy gì, bỏ gì từ Munder Difflin
 
@@ -54,7 +66,29 @@ trang chính thức của Anthropic, OpenAI và Google; nếu một hãng không
 | **M4** | Điều phối: mailbox + sổ task, phiên trưởng nhóm giao việc cho Codex/Gemini qua chế độ không tương tác, breaker | Giao một việc cho trưởng nhóm, thấy nó chia cho hai CLI kia | **Có** |
 | **M5** | Kanban, handoff/compact, lịch chạy | — | **Có** |
 
-M1 và M2 không đổi quyết định cũ nên làm ngay. M3 trở đi cần người dùng đồng ý bỏ giới hạn "chỉ quan sát".
+M1 và M2 không đổi quyết định cũ nên làm ngay. Người dùng đã đồng ý M3 ngày 2026-11-11 (bỏ giới hạn "chỉ quan
+sát"); M4 và M5 chưa hỏi.
+
+### M3 chia nhỏ (bắt đầu 2026-11-11)
+
+| Bước | Nội dung | Trạng thái |
+|---|---|---|
+| M3a | **Chat**: tab giao việc, mỗi cuộc trò chuyện là một session Claude Code (`claude -p … --resume`), nối tiếp được session mở từ terminal / Desktop | Xong 2026-11-11 |
+| M3b | Chat cho Codex (`codex exec --json`, `codex exec resume`) và Gemini — sau khi tra điều khoản OpenAI / Google và kiểm chứng định dạng | Chưa |
+| M3c | Hỏi quyền ngay trong Chat (thay cho "từ chối"): `--permission-prompt-tool` hoặc hook Claude (= P7) | Chưa |
+| M3d | Xem lại toàn bộ cuộc trò chuyện của session đang nối tiếp (đọc transcript đầy đủ) | Chưa |
+| M3e | Terminal thật cho agent (PTY `portable-pty` + xterm) cho việc cần TUI: `/login`, `/resume`, lệnh slash | Chưa |
+| M3f | Git worktree cho từng agent; chạy song song nhiều cuộc trò chuyện | Chưa |
+
+Claude Desktop: session tạo từ Chat mở được trong Desktop bằng `/resume` ở ô nhập, nhưng không tự hiện ở danh sách
+bên trái — Desktop chỉ liệt kê session do nó tạo (chỉ mục riêng). PrimeOffice không ghi vào dữ liệu của Desktop.
+
+### Studio (thêm 2026-11-11)
+
+Mỗi tab trong Office là một studio — một công ty cho một mảng (Game, Video/YouTube, …) với mặt bằng, phòng ban và
+thư mục project riêng; bộ skill riêng của từng studio sẽ gắn sau khi người dùng chọn. Từ M3, "Thêm agent" chạy
+trong studio đang mở: agent nhận thư mục và (sau này) bộ skill của studio đó. Thêm một loại studio = một `Plan`
+trong `scripts/gen-studio-layout.py`, phòng ban trong `departments.ts`, một dòng trong `src/lib/studios.ts`.
 
 ## 5. Ghi chú kỹ thuật
 

@@ -9,7 +9,7 @@ diff small; re-apply after every update.
 | `webview/src/components/BottomToolbar.tsx` | `+ Agent` hidden when `isObserveOnly` | PrimeOffice observes; it never launches agents |
 | `webview/src/hooks/useExtensionMessages.ts` | `agentCreated` passes `msg.seatId` to `os.addAgent` (upstream passes `undefined`) | PrimeOffice remembers seats per session; an agent that (re)appears live goes back to its seat |
 | `webview/src/components/SettingsModal.tsx` | Sessions folder, layout import/export, asset folders, Watch All, Hooks, Ghosts, Skip Permissions and host directories hidden when `isObserveOnly` | Those need the pixel-agents server; what is left (sound, labels, areas, debug) works locally |
-| `webview/src/office/engine/departments.ts` (new) | Department table (agent type → department), Area-label matching, sub-agent label | Sub-agents of a Claude Code Game Studios project sit in their department |
+| `webview/src/office/engine/departments.ts` (new) | Department table (agent type → department), Area-label matching, sub-agent label | Sub-agents of a Claude Code Game Studios project sit in their department; 2026-11-11: video studio departments (placeholder agent types) and `LEADERSHIP` for the meeting room |
 | `webview/src/office/engine/officeState.ts` | `addSubagent(…, agentType)`: the sub-agent walks to a seat from `findDepartmentSeat` (Areas named after its department / itself / `areaMappings['agent:<type>']`); on a layout rebuild sub-agents only take such seats | Same |
 | `webview/src/office/types.ts` | `Character.agentType?` | Same |
 | `webview/src/hooks/useExtensionMessages.ts` | `agentToolStart` / `subagentToolStart` pass `msg.agentType` to `addSubagent`; label = `subagentLabel(type, task)` | Same |

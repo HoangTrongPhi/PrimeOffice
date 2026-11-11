@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
+use super::studio_cmd::{self, Studios};
 use crate::core::observer::{Observer, ObserverConfig, Seat};
 use crate::core::providers::{home_dir, now_ms, registry, AgentSession};
 use crate::utils::logbus::{self, Level};
@@ -62,12 +63,18 @@ impl OfficePrefs {
 pub struct OfficeState {
     pub observer: Arc<Mutex<Observer>>,
     pub prefs: Arc<Mutex<OfficePrefs>>,
+    /// The studios and which one the office shows (`studio_cmd`).
+    pub studios: Arc<Mutex<Studios>>,
 }
 
 impl Default for OfficeState {
     fn default() -> Self {
         let home = home_dir().unwrap_or_else(std::env::temp_dir);
-        OfficeState { observer: Arc::new(Mutex::new(Observer::new(registry(&home), ObserverConfig::default()))), prefs: Arc::new(Mutex::new(OfficePrefs::default())) }
+        OfficeState {
+            observer: Arc::new(Mutex::new(Observer::new(registry(&home), ObserverConfig::default()))),
+            prefs: Arc::new(Mutex::new(OfficePrefs::default())),
+            studios: Arc::new(Mutex::new(Studios::default())),
+        }
     }
 }
 
@@ -80,6 +87,9 @@ pub fn start<R: Runtime>(app: &AppHandle<R>) {
     }
     if let Ok(mut p) = state.prefs.lock() {
         *p = prefs;
+    }
+    if let Ok(mut s) = state.studios.lock() {
+        *s = Studios::load(&studio_cmd::studios_path(app));
     }
     let handle = app.clone();
     let spawned = std::thread::Builder::new().name("office-observer".into()).spawn(move || loop {
@@ -97,12 +107,15 @@ pub fn start<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-fn data_file<R: Runtime>(app: &AppHandle<R>, name: &str) -> PathBuf {
+pub fn data_file<R: Runtime>(app: &AppHandle<R>, name: &str) -> PathBuf {
     app.path().app_local_data_dir().unwrap_or_else(|_| std::env::temp_dir().join(env!("CARGO_PKG_NAME"))).join(name)
 }
 
-pub fn layout_path<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
-    data_file(app, "layout.json")
+/// The saved layout of studio `wanted` when it exists, of the active studio otherwise.
+pub fn layout_path<R: Runtime>(app: &AppHandle<R>, office: &OfficeState, wanted: Option<&str>) -> Result<PathBuf, String> {
+    let studios = office.studios.lock().map_err(|e| e.to_string())?;
+    let id = wanted.filter(|w| studios.studios.iter().any(|s| s.id == *w)).unwrap_or(&studios.active);
+    Ok(data_file(app, &studio_cmd::layout_file(id)))
 }
 
 pub fn prefs_path<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
@@ -126,14 +139,14 @@ pub struct OfficeSnapshot {
 
 #[tauri::command]
 pub fn office_snapshot<R: Runtime>(app: AppHandle<R>, office: State<'_, OfficeState>) -> Result<OfficeSnapshot, String> {
-    let layout = std::fs::read_to_string(layout_path(&app)).ok().and_then(|s| serde_json::from_str::<Value>(&s).ok()).filter(Value::is_object);
+    let layout = std::fs::read_to_string(layout_path(&app, &office, None)?).ok().and_then(|s| serde_json::from_str::<Value>(&s).ok()).filter(Value::is_object);
     let (existing, activity) = office.observer.lock().map_err(|e| e.to_string())?.snapshot();
     let prefs = office.prefs.lock().map_err(|e| e.to_string())?;
     Ok(OfficeSnapshot { settings: settings_message(&prefs), area_mappings: json!({ "type": "areaMappingsLoaded", "mappings": prefs.area_mappings }), existing, layout, activity })
 }
 
-/// A `ClientMessage` from the office UI. PrimeOffice only observes, so launching, terminals and
-/// hooks are ignored; the layout, the office's own settings, seats and folder areas are saved, and
+/// A `ClientMessage` from the office UI. The office only observes (agents are started from the Chat
+/// tab, `chat_cmd`), so its launching, terminals and hooks are ignored; the layout, the office's own settings, seats and folder areas are saved, and
 /// the × on an agent hides it until it works again.
 #[tauri::command]
 pub fn office_send<R: Runtime>(app: AppHandle<R>, office: State<'_, OfficeState>, message: Value) -> Result<(), String> {
@@ -141,7 +154,9 @@ pub fn office_send<R: Runtime>(app: AppHandle<R>, office: State<'_, OfficeState>
         Some("saveLayout") => {
             let layout = message.get("layout").filter(|l| l.is_object()).ok_or("saveLayout without a layout")?;
             let json = serde_json::to_string_pretty(layout).map_err(|e| e.to_string())?;
-            crate::utils::paths::write_atomic(&layout_path(&app), json.as_bytes()).map_err(|e| format!("Cannot save the layout: {e}"))?;
+            // `studio`: the studio the frame was showing (it may have been switched since).
+            let path = layout_path(&app, &office, message.get("studio").and_then(Value::as_str))?;
+            crate::utils::paths::write_atomic(&path, json.as_bytes()).map_err(|e| format!("Cannot save the layout: {e}"))?;
             logbus::emit(&app, Level::Info, "office", "Layout saved");
             Ok(())
         }

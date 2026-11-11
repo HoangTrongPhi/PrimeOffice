@@ -51,7 +51,7 @@ const gettingStarted: HelpTopic = {
       ),
       tips(
         ["Một tiến trình nền kiểm tra **mỗi giây** các transcript thay đổi trong khoảng **Active in** (mặc định 30 phút) và chỉ đọc các dòng mới. Session nào im lâu hơn khoảng đó thì nhân vật rời văn phòng.", "A background observer checks **every second** for transcripts that changed within the **Active in** window (30 minutes by default) and reads only the new lines. When a session stays quiet longer than that, its character leaves the office."],
-        ["Không dùng hook, không sửa `~/.claude/settings.json`, không khởi chạy hay điều khiển agent, không gửi gì lên mạng.", "No hooks, no change to `~/.claude/settings.json`, it never launches or steers an agent, and nothing is sent over the network."],
+        ["Văn phòng chỉ quan sát: không dùng hook, không sửa `~/.claude/settings.json`, không gửi gì lên mạng. Chỉ tab **Chat** mới chạy agent, và chỉ khi bạn gửi tin nhắn.", "The office only observes: no hooks, no change to `~/.claude/settings.json`, nothing is sent over the network. Only the **Chat** tab starts an agent, and only when you send a message."],
         ["Session Codex CLI (`~/.codex/sessions`) được đọc giống Claude và vào văn phòng. Gemini (`~/.gemini/tmp`) hiện chỉ được kiểm tra xem thư mục có tồn tại không — chưa vào văn phòng (xem chủ đề **Agents**).", "Codex CLI sessions (`~/.codex/sessions`) are read like Claude's and join the office. Gemini (`~/.gemini/tmp`) is only checked for existence today — it does not join the office yet (see the **Agents** topic)."],
         ["Trạng thái **chờ quyền** (permission) là **phỏng đoán** từ transcript: một tool chưa xong và im hơn 10 giây. Lệnh chạy lâu (Bash, PowerShell), subtask và tìm web không bị đoán như vậy.", "**Waiting for permission** is a **guess** from the transcript: a tool that has not finished and has been quiet for over 10 seconds. Long-running commands (Bash, PowerShell), subtasks and web lookups are never guessed as waiting."],
       ),
@@ -96,14 +96,14 @@ const gettingStarted: HelpTopic = {
       keys(
         ["F1", "Mở / đóng hướng dẫn này (đúng chủ đề của tab đang mở)", "Open / close this guide (on the current tab's topic)"],
         ["Ctrl+K", "Command Palette: chuyển tab, mở thư mục, chạy lại, cập nhật, log, cài đặt…", "Command palette: tabs, open a folder, run again, updates, log, settings…"],
-        ["Ctrl+1 … Ctrl+4", "Chuyển tab (Office, Projects, History, Agents)", "Switch tab (Office, Projects, History, Agents)"],
+        ["Ctrl+1 … Ctrl+5", "Chuyển tab (Office, Chat, Projects, History, Agents)", "Switch tab (Office, Chat, Projects, History, Agents)"],
         ["Ctrl+O", "Mở thư mục project (như khi thả vào tab đang mở)", "Open a project folder (as if dropped on the current tab)"],
         ["F5", "Chạy lại tab hiện tại: Office làm mới danh sách agent, Projects kiểm tra lại project đang chọn, History tải lại, Agents dò lại. Không bao giờ ghi file", "Run the current tab again: Office refreshes the agent list, Projects re-checks the selected project, History reloads, Agents detects again. Never writes anything"],
         ["Ctrl+`", "Hiện / ẩn log", "Show / hide the log"],
         ["Ctrl+,", "Settings (giao diện)", "Settings (appearance)"],
         ["Esc", "Đóng hộp thoại / Command Palette / hướng dẫn", "Close a dialog / the command palette / this guide"],
       ),
-      tips(["Khi bạn vừa bấm vào văn phòng, phím được gửi tới văn phòng: chỉ `F1` được chuyển ra ngoài. Bấm vào header hoặc danh sách bên phải trước khi dùng Ctrl+K, Ctrl+1…4 hay F5. Phím của trình chỉnh sửa layout nằm trong chủ đề **Office — layout editor**.", "Right after you click in the office, keys go to the office: only `F1` is passed on. Click the header or the list on the right before using Ctrl+K, Ctrl+1…4 or F5. The layout editor's keys are in the **Office — layout editor** topic."]),
+      tips(["Khi bạn vừa bấm vào văn phòng, phím được gửi tới văn phòng: chỉ `F1` được chuyển ra ngoài. Bấm vào header hoặc danh sách bên phải trước khi dùng Ctrl+K, Ctrl+1…5 hay F5. Phím của trình chỉnh sửa layout nằm trong chủ đề **Office — layout editor**.", "Right after you click in the office, keys go to the office: only `F1` is passed on. Click the header or the list on the right before using Ctrl+K, Ctrl+1…5 or F5. The layout editor's keys are in the **Office — layout editor** topic."]),
     ),
     section(
       "Giao diện và cập nhật",
@@ -180,10 +180,21 @@ const office: HelpTopic = {
       ),
     ),
     section(
+      "Studio — mỗi tab một công ty",
+      "Studios — one company per tab",
+      tips(
+        ["Dải tab trên cùng của Office là các **studio**. Mỗi studio là một công ty riêng: mặt bằng riêng, phòng ban riêng và các thư mục project của riêng nó. Bấm tab để chuyển; văn phòng nạp lại mặt bằng của studio đó.", "The tab strip on top of Office holds the **studios**. Each studio is a company of its own: its floor, its departments and its project folders. Click a tab to switch; the office reloads that studio's floor."],
+        ["**+** tạo studio mới từ một loại: **Game studio**, **Video studio** (YouTube / sản xuất video: Ban sản xuất, Phòng họp, Publishing & SEO, Script room, Studio head, Editing bay, Motion & graphics, Lounge, Audio booth, Analytics) hoặc **Classic office**. Tối đa 12 studio.", "**+** creates a studio from a kind: **Game studio**, **Video studio** (YouTube / video production: Ban sản xuất, meeting room, Publishing & SEO, Script room, Studio head, Editing bay, Motion & graphics, Lounge, Audio booth, Analytics) or **Classic office**. At most 12 studios."],
+        ["**Studio…** (bên phải dải tab): đổi tên, tick các **thư mục** thuộc studio (agent chạy trong các thư mục đó mới hiện ở đây; không tick gì = hiện mọi project), hoặc xoá studio cùng mặt bằng của nó. Thư mục phải được mở trước bằng **Open folder…** hoặc tab Projects.", "**Studio…** (right of the strip): rename it, tick the **folders** that belong to it (only agents working in those folders appear here; none ticked = every project), or delete the studio and its floor. A folder must be opened first with **Open folder…** or the Projects tab."],
+        ["Trong Video studio, agent con ngồi theo loại: `scriptwriter` → Script room, `video-editor` → Editing bay, `thumbnail-designer` → Motion & graphics, `voice-over-artist` → Audio booth, `seo-specialist` → Publishing & SEO, `retention-analyst` → Analytics, `showrunner` → Ban sản xuất. Đây là tên tạm cho tới khi bộ skill của studio được chọn.", "In a Video studio sub-agents sit by type: `scriptwriter` → Script room, `video-editor` → Editing bay, `thumbnail-designer` → Motion & graphics, `voice-over-artist` → Audio booth, `seo-specialist` → Publishing & SEO, `retention-analyst` → Analytics, `showrunner` → Ban sản xuất. These names are placeholders until the studio's skill set is chosen."],
+        ["Danh sách studio lưu ở `studios.json`; mặt bằng của từng studio ở `layout.json` (studio đầu tiên) và `layout-<id>.json`.", "The studio list is saved in `studios.json`; each studio's floor in `layout.json` (the first studio) and `layout-<id>.json`."],
+      ),
+    ),
+    section(
       "Mặt bằng studio và phòng ban",
       "Studio floor plan and departments",
       tips(
-        ["**Floor plan…** (thanh trên) nạp **Game studio**: Ban giám đốc, Phòng họp, Release & ops, Design, Studio head, Engineering, Narrative, Art, Audio, Engine lab, Loc & community, Lounge, QA — theo studio của Claude Code Game Studios (UEHF_Studio và các game của nó). **Classic office** đưa văn phòng nhỏ ban đầu trở lại. Nạp mặt bằng sẽ thay bố cục hiện tại.", "**Floor plan…** (top bar) loads **Game studio**: Directors (Ban giám đốc), Meeting room (Phòng họp), Release & ops, Design, Studio head, Engineering, Narrative, Art, Audio, Engine lab, Loc & community, Lounge, QA — the studio of Claude Code Game Studios (UEHF_Studio and its games). **Classic office** brings the small starting office back. Loading a floor plan replaces the current layout."],
+        ["**Floor plan…** (thanh trên) nạp **Game studio**: Ban giám đốc, Phòng họp, Release & ops, Design, Studio head, Engineering, Narrative, Art, Audio, Engine lab, Loc & community, Lounge, QA — theo studio của Claude Code Game Studios (UEHF_Studio và các game của nó). **Video studio** và **Classic office** cũng nạp được ở đây. Nạp mặt bằng sẽ thay bố cục của studio đang mở.", "**Floor plan…** (top bar) loads **Game studio**: Directors (Ban giám đốc), Meeting room (Phòng họp), Release & ops, Design, Studio head, Engineering, Narrative, Art, Audio, Engine lab, Loc & community, Lounge, QA — the studio of Claude Code Game Studios (UEHF_Studio and its games). **Video studio** and **Classic office** load here too. Loading a floor plan replaces the layout of the studio on screen."],
         ["Mỗi agent con (`Agent` / `Task`) là một nhân vật riêng: xuất hiện cạnh session gọi nó rồi **đi về bàn trong phòng ban của mình** theo loại agent (`gameplay-programmer` → Engineering, `ue-gas-specialist` → Engine lab, `qa-tester` → QA …). Nhãn trên đầu: loại agent · việc được giao; chọn nhân vật để thấy tool đang chạy.", "Every sub-agent (`Agent` / `Task`) is its own character: it appears beside the session that started it, then **walks to a desk in its department** by agent type (`gameplay-programmer` → Engineering, `ue-gas-specialist` → Engine lab, `qa-tester` → QA …). Its label: agent type · task; select it to see the tool it is running."],
         ["Session chính ngồi ở **Studio head**; **xong lượt** thì ra **Lounge** nghỉ, có việc mới hoặc cần hỏi bạn thì quay về bàn. Agent không thuộc phòng nào (`general-purpose`, `Explore`) đứng cạnh session đã gọi nó.", "Main sessions sit at **Studio head**; when their **turn is done** they rest in the **Lounge** and come back to their desk for new work or a question for you. Agents without a department (`general-purpose`, `Explore`) stand by the session that started them."],
         ["**Phòng họp**: khi từ 2 giám đốc (creative-director, technical-director, producer) cùng làm việc — như một director gate — họ sang phòng họp, xong ai về bàn nấy. **Editor desk** (trong Engine lab): agent gọi editor qua MCP (`mcp__unreal-mcp__call_tool` …) sang ngồi đó, **mỗi lúc một người** như Unreal MCP; người sau chờ ở bàn mình rồi vào khi bàn trống. Phòng ban hết bàn thì agent đứng trong phòng.", "**Meeting room**: when 2 or more directors (creative-director, technical-director, producer) work at once — a director gate — they move to the meeting room and go back to their desks as they finish. **Editor desk** (in Engine lab): an agent calling the editor through MCP (`mcp__unreal-mcp__call_tool` …) sits there, **one at a time** like Unreal MCP; the next one waits at its own desk and takes the desk when it is free. A department with no free desk: the agent stands in the room."],
@@ -497,4 +508,45 @@ const cli: HelpTopic = {
 };
 
 /** Every topic, in panel order: Getting started, then the tabs in rail order with their sub-topics, then the command line. */
-export const HELP_TOPICS: HelpTopic[] = [gettingStarted, office, officeLayout, session, projects, history, providers, cli];
+// ---------------------------------------------------------------- Chat
+
+const chat: HelpTopic = {
+  id: "chat",
+  title: { vi: "Chat — giao việc cho agent", en: "Chat — give an agent work" },
+  summary: {
+    vi: "Viết yêu cầu, Claude Code làm trong thư mục bạn chọn. Mỗi cuộc trò chuyện là một session Claude Code bình thường: nối tiếp được từ terminal hay Claude Desktop.",
+    en: "Write what you want done and Claude Code does it in the folder you pick. Every conversation is an ordinary Claude Code session: continue it from a terminal or Claude Desktop.",
+  },
+  sections: [
+    section(
+      "Cách dùng",
+      "How to use it",
+      tips(
+        ["Chọn **Folder** (thư mục project — của studio đang mở trước), gõ yêu cầu, **Enter** để gửi (**Shift+Enter** xuống dòng). Câu trả lời hiện dần; mỗi tool agent dùng là một dòng (đang chạy, xong, lỗi).", "Pick a **Folder** (a project folder — the open studio's first), write the task, **Enter** to send (**Shift+Enter** for a new line). The reply streams in; each tool the agent uses is a line (running, done, failed)."],
+        ["Cột trái là các **session Claude Code của thư mục đó** — gồm cả session bạn mở từ terminal hay Claude Desktop. Bấm một session để **nối tiếp** nó; **New session** để bắt đầu mới. Khi nối tiếp chỉ hiện lượt trao đổi cuối, nhưng agent có toàn bộ cuộc trò chuyện.", "The left column lists the **folder's Claude Code sessions** — including the ones you started in a terminal or Claude Desktop. Click one to **continue** it; **New session** starts fresh. Continuing shows only the last exchange, but the agent has the whole conversation."],
+        ["**Stop** dừng lượt đang chạy. Lượt vẫn chạy khi bạn sang tab khác; nhân vật của session xuất hiện trong Office như mọi session.", "**Stop** ends the running turn. A turn keeps running while you are on another tab; the session's character appears in Office like any session."],
+        ["Đừng gửi tin cho **cùng một session** từ hai nơi cùng lúc (Chat và Claude Desktop): hai bên sẽ ghi chồng lên nhau.", "Do not message the **same session** from two places at once (Chat and Claude Desktop): they would write over each other."],
+      ),
+    ),
+    section(
+      "Quyền của agent (May)",
+      "What the agent may do (May)",
+      tips(
+        ["Một lượt Chat không dừng lại hỏi bạn được: việc gì không được phép thì **bị từ chối** và có dòng báo ở cuối lượt.", "A Chat turn cannot stop to ask you: what is not allowed is **refused**, with a note at the end of the turn."],
+        ["**Edit files** (mặc định): đọc và sửa file trong thư mục; lệnh chỉ chạy khi settings Claude Code của project cho phép. **Plan only**: chỉ đọc và lập kế hoạch. **Ask first**: chỉ những gì settings đã cho phép. **Full auto**: không kiểm tra quyền — chỉ dùng trong thư mục bạn chấp nhận mất.", "**Edit files** (default): reads and edits files in the folder; commands run only when the project's Claude Code settings allow them. **Plan only**: reads and plans. **Ask first**: only what your settings already allow. **Full auto**: no permission checks — only in a folder you can afford to lose."],
+      ),
+    ),
+    section(
+      "Tài khoản và Claude Desktop",
+      "Your account and Claude Desktop",
+      tips(
+        ["PrimeOffice chạy **chính CLI `claude` của Anthropic** trên máy bạn (`claude -p`, chế độ không tương tác có trong tài liệu). CLI tự đăng nhập như trong terminal; PrimeOffice không đọc token, không gọi máy chủ của Anthropic. Lượt Chat tính vào hạn mức gói của bạn.", "PrimeOffice runs **Anthropic's own `claude` CLI** on your PC (`claude -p`, its documented non-interactive mode). The CLI signs in by itself as in a terminal; PrimeOffice reads no token and calls no Anthropic server. Chat turns count against your plan's limits."],
+        ["Chưa có CLI: cài Claude Code, chạy `claude` một lần trong terminal và đăng nhập ở đó.", "No CLI yet: install Claude Code, run `claude` once in a terminal and sign in there."],
+        ["Session tạo từ Chat là session Claude Code thật (`~/.claude/projects`). Trong **Claude Desktop** gõ `/resume` ở ô nhập để mở nó; nó **không tự hiện** trong danh sách bên trái của Desktop, vì Desktop chỉ liệt kê session do chính nó tạo. Trong terminal: `claude --resume`.", "A session made in Chat is a real Claude Code session (`~/.claude/projects`). In **Claude Desktop** type `/resume` in the prompt box to open it; it does **not appear by itself** in Desktop's sidebar, because Desktop lists only the sessions it created. In a terminal: `claude --resume`."],
+        ["Chat hiện chỉ chạy Claude Code. Codex và Gemini sẽ có sau.", "Chat runs Claude Code only for now. Codex and Gemini come later."],
+      ),
+    ),
+  ],
+};
+
+export const HELP_TOPICS: HelpTopic[] = [gettingStarted, office, officeLayout, session, chat, projects, history, providers, cli];
