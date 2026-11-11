@@ -1,5 +1,6 @@
-// The Terminal tab: real terminals (term_cmd.rs) running a vendor CLI or the shell. The store keeps
-// the list; what each terminal shows lives in its xterm screen (lib/termScreens.ts, loaded on demand).
+// Real terminals (term_cmd.rs) running a vendor CLI or the shell — opened from the Terminal tab, from
+// Office's "Add agent" and from Chat. The store keeps the list; what each terminal shows lives in its
+// xterm screen (lib/termScreens.ts, loaded on demand).
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { registerDropHandler } from "../lib/dropRouter";
@@ -13,7 +14,11 @@ export interface TermTab {
   key: number;
   preset: string;
   label: string;
+  /** Name the user gave it (Add agent, rename); "" = none. */
+  name: string;
   cwd: string;
+  /** The Claude Code session it runs, when known (resumed, or started with that id). */
+  sessionId: string | null;
   /** Title the program set (most CLIs do), "" until then. */
   title: string;
   state: "starting" | "running" | "ended";
@@ -21,18 +26,37 @@ export interface TermTab {
   code: number | null;
 }
 
+export interface OpenOptions {
+  preset: string;
+  cwd: string;
+  /** Claude Code: continue this session (`--resume`). */
+  resume?: string | null;
+  /** Claude Code: start a new session with a known id (`--session-id`), so it can be matched with its
+   *  character in the office. */
+  newSession?: boolean;
+  model?: string | null;
+  permissionMode?: string | null;
+  name?: string;
+  /** Text typed into the program once it has started and gone quiet, then Enter: the agent's
+   *  first task. Only what the user wrote for this agent. */
+  firstTask?: string;
+}
+
 interface TermState {
   /** Folder a new terminal starts in. */
   cwd: string | null;
   presets: TermPreset[];
   tabs: TermTab[];
-  /** Key of the terminal on screen. */
+  /** Key of the terminal on screen in the Terminal tab. */
   active: number | null;
   setCwd: (cwd: string | null) => void;
   setActive: (key: number) => void;
   loadPresets: () => Promise<void>;
-  /** Start `preset` in `cwd`; `sessionId` opens that Claude Code session (`claude --resume`). */
-  open: (preset: string, cwd: string, sessionId?: string | null) => Promise<void>;
+  /** Start a terminal; answers its key (also when it fails to start: the tab shows why). */
+  open: (opts: OpenOptions) => Promise<number | null>;
+  rename: (key: number, name: string) => void;
+  /** Paste `text` into a running terminal and press Enter (Office's dispatch). False when it is not running. */
+  send: (key: number, text: string) => boolean;
   /** End the terminal's program and remove its tab. */
   close: (key: number) => void;
 }
@@ -44,17 +68,50 @@ const idOf = new Map<number, number>();
 /** Terminals whose `term_open` has not answered yet: their first events may come before the id. */
 let opening = 0;
 let early: TermEvent[] = [];
+/** First tasks waiting for their program to start and go quiet. */
+const pendingTask = new Map<number, { text: string; timer: ReturnType<typeof setTimeout> | null }>();
+/** Quiet this long after the last output = the program is ready for typing. */
+const READY_QUIET_MS = 1500;
 const loadScreens = () => import("../lib/termScreens");
 let screens: Awaited<ReturnType<typeof loadScreens>> | null = null;
 
-const patch = (key: number, change: Partial<TermTab>) => useTermStore.setState((s) => ({ tabs: s.tabs.map((t) => (t.key === key ? { ...t, ...change } : t)) }));
+function patch(key: number, change: Partial<TermTab>): void {
+  useTermStore.setState((s: TermState) => ({ tabs: s.tabs.map((t) => (t.key === key ? { ...t, ...change } : t)) }));
+}
+
+/** xterm's paste (bracketed when the program asked for it), then Enter. */
+function typeInto(key: number, text: string): boolean {
+  const screen = screens?.getScreen(key);
+  if (!screen || !idOf.has(key) || !text.trim()) return false;
+  screen.term.paste(text);
+  const id = idOf.get(key);
+  setTimeout(() => id !== undefined && void ipc.termWrite(id, "\r").catch(() => {}), 120);
+  return true;
+}
+
+/** Output arrived: (re)start the quiet timer of a pending first task. */
+function armTask(key: number) {
+  const task = pendingTask.get(key);
+  if (!task) return;
+  if (task.timer) clearTimeout(task.timer);
+  task.timer = setTimeout(() => {
+    pendingTask.delete(key);
+    typeInto(key, task.text);
+  }, READY_QUIET_MS);
+}
 
 function apply(key: number, e: TermEvent) {
   const screen = screens?.getScreen(key);
-  if (e.data) screen?.term.write(e.data);
+  if (e.data) {
+    screen?.term.write(e.data);
+    armTask(key);
+  }
   if (e.exit !== undefined) {
     screen?.term.write(`\r\n\x1b[2m[ended${typeof e.exit === "number" ? ` with code ${e.exit}` : ""}]\x1b[0m\r\n`);
     patch(key, { state: "ended", code: e.exit ?? null });
+    const task = pendingTask.get(key);
+    if (task?.timer) clearTimeout(task.timer);
+    pendingTask.delete(key);
     idOf.delete(key);
     keyOf.delete(e.termId);
   }
@@ -83,10 +140,13 @@ export const useTermStore = create<TermState>()(
           uiLog("error", `Terminal: ${errorText(e)}`);
         }
       },
-      open: async (preset, cwd, sessionId) => {
-        if (!inTauri) return;
+      open: async (opts) => {
+        if (!inTauri) return null;
         const key = ++seq;
+        const { preset, cwd } = opts;
         const label = get().presets.find((p) => p.id === preset)?.label ?? preset;
+        const newSessionId = preset === "claude" && opts.newSession && !opts.resume ? crypto.randomUUID() : null;
+        const sessionId = preset === "claude" ? opts.resume || newSessionId : null;
         screens ??= await loadScreens();
         const screen = screens.createScreen(key, {
           onInput: (data) => {
@@ -99,15 +159,16 @@ export const useTermStore = create<TermState>()(
           },
           onTitle: (title) => patch(key, { title }),
         });
-        set((s) => ({ tabs: [...s.tabs, { key, preset, label, cwd, title: "", state: "starting", code: null }], active: key }));
+        set((s) => ({ tabs: [...s.tabs, { key, preset, label, name: opts.name?.trim() ?? "", cwd, sessionId, title: "", state: "starting", code: null }], active: key }));
+        if (opts.firstTask?.trim()) pendingTask.set(key, { text: opts.firstTask.trim(), timer: null });
         const { cols, rows } = screen.term;
         opening++;
         try {
-          const id = await ipc.termOpen({ preset, cwd, cols, rows, sessionId: sessionId ?? null });
+          const id = await ipc.termOpen({ preset, cwd, cols, rows, sessionId: opts.resume || null, newSessionId, model: opts.model || null, permissionMode: opts.permissionMode || null });
           if (!get().tabs.some((t) => t.key === key)) {
             // Closed while it was starting.
             void ipc.termClose(id).catch(() => {});
-            return;
+            return key;
           }
           keyOf.set(id, key);
           idOf.set(key, id);
@@ -120,10 +181,14 @@ export const useTermStore = create<TermState>()(
         } catch (e) {
           screen.term.write(`\x1b[31m${errorText(e)}\x1b[0m\r\n`);
           patch(key, { state: "ended" });
+          pendingTask.delete(key);
         } finally {
           if (--opening === 0) early = [];
         }
+        return key;
       },
+      rename: (key, name) => patch(key, { name: name.trim().slice(0, 40) }),
+      send: (key, text) => typeInto(key, text),
       close: (key) => {
         const id = idOf.get(key);
         if (id !== undefined) {
@@ -131,6 +196,9 @@ export const useTermStore = create<TermState>()(
           idOf.delete(key);
           keyOf.delete(id);
         }
+        const task = pendingTask.get(key);
+        if (task?.timer) clearTimeout(task.timer);
+        pendingTask.delete(key);
         screens?.disposeScreen(key);
         set((s) => {
           const at = s.tabs.findIndex((t) => t.key === key);
@@ -143,6 +211,11 @@ export const useTermStore = create<TermState>()(
     { name: "primeoffice.terminal", partialize: (s) => ({ cwd: s.cwd }) },
   ),
 );
+
+/** A terminal's name on screen: the one it was given, else "<CLI> · <folder>". */
+export function termName(t: TermTab): string {
+  return t.name || `${t.label} · ${t.cwd.split(/[\\/]/).filter(Boolean).pop() ?? t.cwd}`;
+}
 
 // Terminals keep running while another tab is on screen: listen for the whole life of the app.
 if (inTauri) void on.term(handle);

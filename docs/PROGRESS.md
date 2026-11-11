@@ -82,6 +82,22 @@
   the Chat button on a session Chat is also using is not prevented (only disabled while a turn runs). The preset
   table is the cut-down "preset provider" of the plan (no model / resume flags beyond Claude's `--resume`, no
   custom command, no Antigravity).
+- [x] Office control room (2026-11-11, asked by the user: "Office like cusMunderDifflin — Add agent, Command Center…,
+  features only, keep our colours and theme") — layout taken from Munder Difflin's App / AgentStrip / AgentDetailPanel
+  / CommandCenterPanel / AddAgentModal, rebuilt on PrimeOffice's own data and theme tokens (no code or art copied):
+  `components/office/` (AgentStrip, AgentPanel + TermPanel, CommandCenter, AddAgentModal, TermView + TermComposer),
+  `stores/officeUiStore.ts` (terminal-card selection, sidebar width/tabs, names by session id). Backend:
+  `term_open` takes `newSessionId` (`claude --session-id`), `model` (`--model`, claude/codex/gemini) and
+  `permissionMode` (claude), all checked like Chat's; tests added. A first task / dispatch is pasted through xterm
+  (bracketed when the program asks) and Enter once the output has been quiet 1.5 s. Checked: 66 Rust tests, typecheck,
+  30/30 mocked, `?mock` (Add agent → card + sidebar terminal with the first task typed; Conversation tab;
+  Terminal = resume; Dispatch into a terminal), and the real window (debug build with its own WebView2 folder, since
+  the installed copy was running): Shell agent ran its first task (`prime-42-office`), Claude Code started with
+  `--session-id` and drew its TUI in the sidebar, End removed its card; no console errors. Left out of Munder
+  Difflin's: the orchestrator ("Michael") and its tabs (tasks, ask me, triggers, memory, graph, skills, workers —
+  M4/M5 or out of scope), token budgets / breaker, restore team, characters and colours per agent, git isolation
+  (M3f), the IDE. Not checked: Codex / Gemini model flags on a real CLI (not installed); a Claude first task
+  reaching the model (the account's policy blocks Claude Code turns, see M3c).
 - [x] Studios (2026-11-11, asked by the user: "each tab a company for one field, its own skill set later") — tab
   strip in Office, `studio_cmd.rs` (`studios.json`, `layout-<id>.json`), kinds in `src/lib/studios.ts`, Video
   studio plan (`gen-studio-layout.py` now builds every plan; game-studio.json unchanged byte for byte) and video

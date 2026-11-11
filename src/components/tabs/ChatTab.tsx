@@ -12,7 +12,8 @@ import { folderName, relTime, StatusPill } from "../session/SessionView";
 
 const FIELD = "h-7 rounded-md border border-edge bg-canvas/70 px-2 text-[12px] text-ink";
 
-function Item({ item }: { item: ChatItem }) {
+/** One entry of a conversation (Chat, and the Office sidebar's Conversation tab). */
+export function ChatItemView({ item }: { item: ChatItem }) {
   switch (item.kind) {
     case "user":
       return (
@@ -126,7 +127,7 @@ export function ChatTab() {
           title={view.sessionId ? "Open this session in a real terminal (claude --resume): sign in with /login, slash commands, permission prompts" : "Open Claude Code in a real terminal in this folder: sign in with /login, /resume, slash commands"}
           onClick={() => {
             if (!cwd) return;
-            void useTermStore.getState().open("claude", cwd, view.sessionId);
+            void useTermStore.getState().open({ preset: "claude", cwd, resume: view.sessionId });
             useAppStore.getState().setActiveTab("terminal");
           }}
         >
@@ -199,7 +200,7 @@ export function ChatTab() {
                   </div>
                 )}
                 {view.items.map((item, i) => (
-                  <Item key={i} item={item} />
+                  <ChatItemView key={i} item={item} />
                 ))}
                 {busy && view.items.at(-1)?.kind === "user" && (
                   <div className="flex items-center gap-2 text-[11.5px] text-ink-faint">

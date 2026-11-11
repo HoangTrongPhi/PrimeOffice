@@ -1,5 +1,5 @@
-import { EmptyState, Modal, PillBadge } from "@abyss/ui";
-import { Building2, ChevronRight, FolderOpen, LayoutGrid, Plus, Settings2, Trash2, Users, X } from "lucide-react";
+import { Modal, PillBadge } from "@abyss/ui";
+import { Building2, FolderOpen, LayoutGrid, PanelRightClose, PanelRightOpen, Plus, Settings2, Trash2, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { handleHelpKey } from "../../hooks/useGlobalHotkeys";
 import { pickPaths } from "../../lib/dialogs";
@@ -8,7 +8,13 @@ import { kindOf, STUDIO_KINDS, studioHasProject } from "../../lib/studios";
 import { errorText, uiLog } from "../../stores/appStore";
 import { connectOfficeFrame } from "../../office/bridge/officeBridge";
 import { useOfficeStore, useProjectStore, useStudioStore } from "../../stores/dataStore";
-import { folderName, relTime, SessionView, StatusPill } from "../session/SessionView";
+import { selectAgent, useOfficeUi } from "../../stores/officeUiStore";
+import { useTermStore } from "../../stores/termStore";
+import { AddAgentModal } from "../office/AddAgentModal";
+import { AgentPanel, TermPanel } from "../office/AgentPanel";
+import { AgentStrip } from "../office/AgentStrip";
+import { CommandCenter } from "../office/CommandCenter";
+import { folderName } from "../session/SessionView";
 
 const WINDOWS = [15, 30, 60, 240, 1440];
 export const CHARACTER_PACKS: { id: string; label: string }[] = [
@@ -47,9 +53,44 @@ function forwardHelpKey(frame: HTMLIFrameElement) {
   }
 }
 
+/** The line between the office and the sidebar: drag it to size the sidebar. */
+function Splitter() {
+  const [dragging, setDragging] = useState(false);
+  return (
+    <>
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Sidebar width"
+        title="Drag to resize the sidebar; double-click for the default width"
+        className={`w-1 shrink-0 cursor-col-resize transition-colors ${dragging ? "bg-accent" : "bg-edge hover:bg-accent/60"}`}
+        onDoubleClick={() => useOfficeUi.getState().setSidebarWidth(420)}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          const startX = e.clientX;
+          const startW = useOfficeUi.getState().sidebarWidth;
+          setDragging(true);
+          const move = (ev: PointerEvent) => useOfficeUi.getState().setSidebarWidth(startW + (startX - ev.clientX));
+          const up = () => {
+            setDragging(false);
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerup", up);
+          };
+          window.addEventListener("pointermove", move);
+          window.addEventListener("pointerup", up);
+        }}
+      />
+      {/* The office frame would swallow the pointer while dragging over it. */}
+      {dragging && <div className="fixed inset-0 z-40 cursor-col-resize" />}
+    </>
+  );
+}
+
 /**
- * The pixel office (an iframe running the vendored pixel-agents UI) with the agent list and detail.
- * The strip on top holds the studios: each one is a company with its own floor and project folders.
+ * The pixel office (an iframe running the vendored pixel-agents UI), laid out as a control room: the
+ * floor, a sidebar on the right (the selected agent, or the Command Center when none is) and the
+ * roster under the floor with Add agent. The strip on top holds the studios: each one is a company
+ * with its own floor and project folders.
  */
 export function OfficeTab() {
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -57,7 +98,8 @@ export function OfficeTab() {
   const projects = useProjectStore((s) => s.projects);
   const { studios, active, loaded } = useStudioStore();
   const [frameKey, setFrameKey] = useState(0);
-  const [listOpen, setListOpen] = useState(true);
+  const { sidebarOpen, sidebarWidth, term, setSidebarOpen } = useOfficeUi();
+  const tabs = useTermStore((s) => s.tabs);
   const [floorOpen, setFloorOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [newKind, setNewKind] = useState("video");
@@ -88,7 +130,7 @@ export function OfficeTab() {
       { id: studioId, planFile },
       {
         onFocusAgent: (id) => {
-          select(id);
+          selectAgent(id);
           void refreshAgents();
         },
         onAgentsChanged: () => void refreshAgents(),
@@ -113,6 +155,10 @@ export function OfficeTab() {
   }, [refreshAgents]);
 
   const selected = agents.find((a) => a.id === selectedId) ?? null;
+  // A terminal card turns into its agent's card once its session has a character.
+  const termTab = term !== null ? tabs.find((t) => t.key === term) : undefined;
+  const termAgent = termTab?.sessionId ? agents.find((a) => a.session.sessionId === termTab.sessionId) : undefined;
+  const shown = selected ?? termAgent ?? null;
   const readyProjects = projects.filter((p) => p.ready && studioHasProject(studio, p.path));
   const store = useStudioStore.getState();
 
@@ -217,8 +263,8 @@ export function OfficeTab() {
         <PillBadge tone={agents.length ? "accent" : "neutral"}>
           <Users className="size-3" /> {agents.length} agent{agents.length === 1 ? "" : "s"}
         </PillBadge>
-        <button type="button" className="btn" onClick={() => setListOpen((o) => !o)} title="Agent list">
-          <ChevronRight className={`size-3.5 transition-transform ${listOpen ? "" : "rotate-180"}`} />
+        <button type="button" className="btn" onClick={() => setSidebarOpen(!sidebarOpen)} title={sidebarOpen ? "Hide the sidebar" : "Show the sidebar (agent detail, Command Center)"}>
+          {sidebarOpen ? <PanelRightClose className="size-3.5" /> : <PanelRightOpen className="size-3.5" />}
         </button>
       </div>
 
@@ -354,43 +400,18 @@ export function OfficeTab() {
           {(loaded || !inTauri) && <iframe key={`${pack}-${studioId}-${frameKey}`} ref={frameRef} src="office.html" title="Office" className="absolute inset-0 size-full border-0" />}
         </div>
 
-        {listOpen && (
-          <aside className="flex w-[340px] shrink-0 flex-col border-l border-edge bg-panel/60">
-            {selected ? (
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                <button type="button" className="mb-3 flex items-center gap-1 text-[11.5px] text-ink-faint hover:text-ink" onClick={() => select(null)}>
-                  <X className="size-3.5" /> Back to the list
-                </button>
-                <SessionView session={selected.session} maxActions={15} />
-              </div>
-            ) : agents.length === 0 ? (
-              <EmptyState icon={<Building2 className="size-5" />} title="The office is quiet">
-                No agent session changed in the last {windowMinutes < 60 ? `${windowMinutes} minutes` : `${windowMinutes / 60} hours`}
-                {project ? ` in ${folderName(project)}` : studio?.projects.length ? ` in the folders of ${studio.name}` : ""}. Start Claude Code or Codex (CLI, Desktop app or IDE) and its character walks in.
-              </EmptyState>
-            ) : (
-              <ul className="min-h-0 flex-1 divide-y divide-edge overflow-y-auto">
-                {agents.map(({ id, session }) => (
-                  <li key={id}>
-                    <button type="button" className="flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-tint/4" onClick={() => select(id)}>
-                      <div className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">{session.title || folderName(session.cwd)}</span>
-                        <StatusPill status={session.status} />
-                      </div>
-                      <div className="truncate text-[11.5px] text-ink-muted">{session.openTools[0]?.label ?? session.actions.at(-1)?.label ?? "—"}</div>
-                      <div className="flex gap-2 text-[10.5px] text-ink-faint">
-                        <span>{folderName(session.cwd)}</span>
-                        <span>·</span>
-                        <span>{relTime(session.lastActivityAt, session.modifiedMs)}</span>
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </aside>
+        {sidebarOpen && (
+          <>
+            <Splitter />
+            <aside className="flex shrink-0 flex-col bg-panel/60" style={{ width: sidebarWidth }}>
+              {shown ? <AgentPanel key={shown.id} agent={shown} /> : termTab ? <TermPanel key={termTab.key} tab={termTab} /> : <CommandCenter />}
+            </aside>
+          </>
         )}
       </div>
+
+      <AgentStrip />
+      <AddAgentModal />
     </div>
   );
 }

@@ -4,6 +4,19 @@ All user-visible changes. Newest first; one section per released version.
 
 ## Unreleased
 
+- **Office, laid out as a control room**: the floor on the left, a sidebar on the right (drag to size it) and an
+  **agent strip** under the floor — one card per agent with its state, name, what it does, folder, CLI and context.
+  - **Add agent** (end of the strip): a four-part form — **Identity** (name), **Workspace** (folder; continue a
+    Claude Code session or start a new one), **Engine** (Claude Code / Codex / Gemini / Shell, model, Claude's
+    permission mode, with the command shown) and **Briefing** (templates, first task). The agent starts in a real
+    terminal shown in the sidebar; its first task is typed in once the CLI is ready. A new Claude Code session gets its
+    id up front, so the terminal joins its character's card when it walks in.
+  - **Agent details** in the sidebar: rename, **Terminal** (opens a Claude Code session with `--resume`), **Chat**,
+    **Folder**, **Hide**; tabs **Terminal** (with a line to type into it), **Activity** and **Conversation** (the
+    whole Claude Code conversation).
+  - **Command Center** (sidebar, nothing selected): **Monitor** (every agent, who needs you first), **Dispatch**
+    (give a task to an agent's terminal or to a new agent) and **Activity** (latest tool calls of every agent).
+
 - **Terminal** (new tab, Ctrl+6): real terminals inside PrimeOffice. Pick a folder and start **Claude Code**, **Codex**,
   **Gemini** or the **Shell** there — the CLI itself, as in a terminal window, for signing in (`/login`), `/resume`,
   slash commands and permission prompts. Up to 8 terminals as tabs; they keep running while another tab is shown.

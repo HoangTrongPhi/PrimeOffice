@@ -133,7 +133,37 @@ const office: HelpTopic = {
       steps(
         ["Chạy Claude Code như thường lệ (terminal, Desktop app hoặc IDE). Trong vòng một giây sau khi transcript thay đổi, nhân vật của session đó bước vào văn phòng.", "Use Claude Code as usual (terminal, Desktop app or IDE). Within a second of its transcript changing, the session's character walks into the office."],
         ["Xem nhãn trên đầu nhân vật: việc đang làm (`Editing App.tsx`, `Running: npm test`, `Searching code`…) và tên thư mục.", "Read the label above the character: what it is doing (`Editing App.tsx`, `Running: npm test`, `Searching code`…) and the folder name."],
-        ["Bấm vào một nhân vật (hoặc một dòng trong danh sách bên phải) để xem prompt cuối, các việc vừa làm và câu trả lời cuối — xem chủ đề **Agent details**.", "Click a character (or a row in the list on the right) to see its last prompt, recent actions and last reply — see the **Agent details** topic."],
+        ["Bấm vào một nhân vật (hoặc thẻ của nó ở dải dưới văn phòng) để mở chi tiết ở sidebar bên phải — xem chủ đề **Agent details**.", "Click a character (or its card in the strip under the office) to open its details in the sidebar on the right — see the **Agent details** topic."],
+      ),
+    ),
+    section(
+      "Bố cục: văn phòng, sidebar, dải agent",
+      "Layout: office, sidebar, agent strip",
+      tips(
+        ["**Dải agent** (dưới văn phòng): mỗi agent một thẻ — trạng thái (chấm màu), tên, việc đang làm, thư mục, CLI và thanh **context**. Bấm thẻ để chọn, bấm lại để bỏ chọn. Thẻ viền nét đứt là terminal mở từ app mà session của nó chưa có nhân vật.", "**Agent strip** (under the office): one card per agent — state (coloured dot), name, what it is doing, folder, CLI and a **context** bar. Click a card to select it, again to deselect. A dashed card is a terminal opened from the app whose session has no character yet."],
+        ["**Sidebar** (bên phải): agent đang chọn, hoặc **Command Center** khi không chọn ai. Kéo vạch ngăn để đổi bề rộng (nhấp đúp: về mặc định); nút ở cuối thanh công cụ ẩn / hiện sidebar.", "**Sidebar** (right): the selected agent, or the **Command Center** when none is. Drag the divider to size it (double-click: default width); the button at the end of the toolbar hides / shows it."],
+      ),
+    ),
+    section(
+      "Add agent",
+      "Add agent",
+      steps(
+        ["Bấm **Add agent** ở cuối dải agent.", "Click **Add agent** at the end of the agent strip."],
+        ["**Identity**: tên hiện trên thẻ, trong Command Center và trên tab terminal (để trống: tên tự động).", "**Identity**: the name on its card, in the Command Center and on its terminal tab (empty: automatic)."],
+        ["**Workspace**: thư mục làm việc (thư mục của studio đang mở trước) và — với Claude Code — tiếp tục một session có sẵn hoặc **New session**.", "**Workspace**: the folder it works in (the open studio's folders first) and — for Claude Code — continue an existing session or **New session**."],
+        ["**Engine**: CLI (**Claude Code**, **Codex**, **Gemini**, **Shell**; nút mờ = chưa cài), **Model**, và với Claude Code **Permissions**. Dòng lệnh sẽ chạy hiện ở chân hộp thoại.", "**Engine**: the CLI (**Claude Code**, **Codex**, **Gemini**, **Shell**; greyed = not installed), **Model**, and for Claude Code **Permissions**. The command that will run is shown at the bottom of the dialog."],
+        ["**Briefing**: chọn một **Template** hoặc tự viết **First task** — nó được gõ vào CLI khi CLI đã khởi động xong, rồi Enter, như bạn tự gõ.", "**Briefing**: pick a **Template** or write the **First task** — it is typed into the CLI once the CLI has started, then Enter, as if you typed it."],
+        ["**Start agent**: CLI chạy trong một terminal thật, hiện ngay ở sidebar. Session Claude Code mới được đặt sẵn id, nên khi nhân vật bước vào văn phòng, thẻ terminal nhập vào thẻ của agent đó.", "**Start agent**: the CLI runs in a real terminal, shown in the sidebar right away. A new Claude Code session gets its id up front, so when its character walks in, the terminal card merges into that agent's card."],
+      ),
+    ),
+    section(
+      "Command Center",
+      "Command Center",
+      tips(
+        ["**Monitor**: mọi agent — ai **cần bạn** đứng đầu, rồi ai đang làm; việc đang làm, số action, CLI, model, thư mục và **ctx** (context). Bấm để mở agent đó.", "**Monitor**: every agent — who **needs you** first, then who works; what it is doing, action count, CLI, model, folder and **ctx** (context). Click one to open it."],
+        ["**Dispatch**: giao việc. **To** một agent có terminal trong app (gõ vào terminal của nó, rồi Enter) hoặc **A new agent…** (chọn CLI và thư mục; việc thành first task). **Ctrl+Enter** để gửi.", "**Dispatch**: give work. **To** an agent with a terminal in the app (typed into its terminal, then Enter) or **A new agent…** (pick the CLI and folder; the task becomes its first task). **Ctrl+Enter** sends."],
+        ["**Activity**: các tool call mới nhất của mọi agent, mới nhất trước.", "**Activity**: the latest tool calls of every agent, newest first."],
+        ["Agent chạy ngoài PrimeOffice không có terminal trong app: mở session của nó trong terminal từ chi tiết agent (Claude Code), hoặc tiếp tục ở Chat.", "An agent started outside PrimeOffice has no terminal in the app: open its session in one from its details (Claude Code), or continue it in Chat."],
       ),
     ),
     section(
@@ -144,7 +174,7 @@ const office: HelpTopic = {
         ["**Open folder…**: mở một thư mục project; nếu nó Ready thì văn phòng lọc theo nó, nếu không thì chuyển sang Projects.", "**Open folder…**: opens a project folder; if it is Ready the office filters to it, otherwise you go to Projects."],
         ["**Active in**: `15 min`, `30 min`, `1 h`, `4 h`, `24 h` — session có transcript thay đổi trong khoảng này thì có mặt; im lâu hơn thì nhân vật rời đi. Khoảng này cũng quyết định nhãn **Idle** trong History.", "**Active in**: `15 min`, `30 min`, `1 h`, `4 h`, `24 h` — sessions whose transcript changed within this window are in the office; quieter ones leave. The same window decides the **Idle** status in History."],
         ["**Crew**: **PrimeOffice crew** (8 nhân vật do ứng dụng tự vẽ) hoặc **Classic (pixel-agents)**. Đổi crew sẽ tải lại văn phòng.", "**Crew**: **PrimeOffice crew** (8 characters drawn by the app's own generator) or **Classic (pixel-agents)**. Switching crew reloads the office."],
-        ["Nhãn **N agents** đếm số nhân vật; nút mũi tên (**Agent list**) ẩn / hiện cột bên phải. Project, Active in và Crew được nhớ cho lần mở sau.", "The **N agents** pill counts the characters; the arrow button (**Agent list**) hides / shows the right column. Project, Active in and Crew are remembered for next time."],
+        ["Nhãn **N agents** đếm số nhân vật; nút cuối cùng ẩn / hiện sidebar. Project, Active in, Crew và bề rộng sidebar được nhớ cho lần mở sau.", "The **N agents** pill counts the characters; the last button hides / shows the sidebar. Project, Active in, Crew and the sidebar width are remembered for next time."],
       ),
     ),
     section(

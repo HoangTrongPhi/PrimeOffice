@@ -1,16 +1,16 @@
 import { EmptyState } from "@abyss/ui";
 import { FolderOpen, Plus, SquareTerminal, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { pickPaths } from "../../lib/dialogs";
 import { studioHasProject } from "../../lib/studios";
-import { attachScreen, fitScreen, getScreen } from "../../lib/termScreens";
 import { currentStudio, useProjectStore, useStudioStore } from "../../stores/dataStore";
-import { useTermStore, type TermTab } from "../../stores/termStore";
+import { termName, useTermStore } from "../../stores/termStore";
+import { TermView } from "../office/TermView";
 import { folderName } from "../session/SessionView";
 
 const FIELD = "h-7 rounded-md border border-edge bg-canvas/70 px-2 text-[12px] text-ink";
 
-const tabTitle = (t: TermTab) => `${t.label} · ${folderName(t.cwd)}`;
+const tabTitle = termName;
 
 /**
  * Terminal: real terminals inside PrimeOffice, each running a vendor CLI (Claude Code, Codex, Gemini)
@@ -22,7 +22,6 @@ export function TerminalTab() {
   const projects = useProjectStore((s) => s.projects);
   // Re-render when the studio on screen changes: its folders come first.
   useStudioStore((s) => s.active);
-  const hostRef = useRef<HTMLDivElement>(null);
   const folders = projects.filter((p) => studioHasProject(currentStudio(), p.path));
   const current = tabs.find((t) => t.key === active) ?? null;
 
@@ -31,20 +30,6 @@ export function TerminalTab() {
     void useProjectStore.getState().load();
     void useStudioStore.getState().load();
   }, []);
-
-  // Put the active terminal's screen into the page, and keep it sized to the tab.
-  useEffect(() => {
-    const host = hostRef.current;
-    const screen = active === null ? undefined : getScreen(active);
-    if (!host || !screen) return;
-    attachScreen(screen, host);
-    const observer = new ResizeObserver(() => fitScreen(screen));
-    observer.observe(host);
-    return () => {
-      observer.disconnect();
-      screen.el.remove();
-    };
-  }, [active]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -71,7 +56,7 @@ export function TerminalTab() {
             type="button"
             className="btn"
             disabled={!cwd || !p.found}
-            onClick={() => cwd && void open(p.id, cwd)}
+            onClick={() => cwd && void open({ preset: p.id, cwd })}
             title={!p.found ? `${p.label} is not installed. ${p.hint}` : !cwd ? "Pick a folder first" : `Start ${p.label} in ${folderName(cwd)}${p.path ? ` (${p.path})` : ""}`}
           >
             <Plus className="size-3.5" /> {p.label}
@@ -98,7 +83,7 @@ export function TerminalTab() {
 
       <div className="relative min-h-0 flex-1 bg-canvas">
         {current ? (
-          <div ref={hostRef} className="absolute inset-0 overflow-hidden p-2" />
+          <TermView key={current.key} termKey={current.key} className="absolute inset-0" />
         ) : (
           <EmptyState icon={<SquareTerminal className="size-5" />} title={cwd ? `No terminal open in ${folderName(cwd)}` : "Pick a folder first"}>
             {cwd

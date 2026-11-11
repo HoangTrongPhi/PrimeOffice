@@ -25,7 +25,7 @@ use crate::utils::logbus::{self, Level};
 pub const CHAT_EVENT: &str = "chat://event";
 /// The modes Chat offers, by the names Claude Code 2.1.319 lists for `--permission-mode`
 /// (`manual` is what older versions called `default`).
-const PERMISSION_MODES: &[&str] = &["manual", "acceptEdits", "plan", "bypassPermissions"];
+pub(crate) const PERMISSION_MODES: &[&str] = &["manual", "acceptEdits", "plan", "bypassPermissions"];
 const PROMPT_MAX: usize = 200_000;
 const STDERR_TAIL: usize = 2_000;
 
@@ -71,7 +71,7 @@ pub(crate) fn is_session_id(s: &str) -> bool {
     s.len() == 36 && s.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
 }
 
-fn is_model(s: &str) -> bool {
+pub(crate) fn is_model(s: &str) -> bool {
     !s.is_empty() && s.len() <= 64 && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '[' | ']'))
 }
 

@@ -204,6 +204,12 @@ export interface TermRequest {
   rows: number;
   /** Claude Code only: the session to open (`claude --resume <id>`). */
   sessionId?: string | null;
+  /** Claude Code only: start a new session with this id (`--session-id`). */
+  newSessionId?: string | null;
+  /** `--model` for a vendor CLI; null = its default. */
+  model?: string | null;
+  /** Claude Code only: `--permission-mode`. */
+  permissionMode?: string | null;
 }
 
 /** Payload of `term://event`: output of a terminal, or its end (`exit`: the code, null when unknown). */

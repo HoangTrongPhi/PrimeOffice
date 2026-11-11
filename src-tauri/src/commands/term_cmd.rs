@@ -2,8 +2,9 @@
 //! in (`/login`), `/resume`, slash commands, or simply working in the TUI. A terminal is a pseudo
 //! console (`portable-pty`: ConPTY on Windows) running a shell or a vendor CLI exactly as a terminal
 //! window would: the user types, the CLI answers. PrimeOffice passes the bytes through and nothing
-//! else — it does not type on the user's behalf and does not read what is shown
-//! (docs/INTEGRATION_PLAN.md §2).
+//! else. The only text it sends by itself is what the user wrote for that agent in the app (Office's
+//! first task and Dispatch), pasted once, as the user would; it never makes up input, never loops,
+//! and does not read what is shown (docs/INTEGRATION_PLAN.md §2).
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -16,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Runtime, State};
 
-use super::chat_cmd::{installed, is_session_id};
+use super::chat_cmd::{installed, is_model, is_session_id, PERMISSION_MODES};
 use crate::utils::logbus::{self, Level};
 
 /// Event name; keep in sync with `EVENTS.term` in `src/lib/ipc.ts`. Payload: `{ termId, data }` for
@@ -66,6 +67,16 @@ pub struct TermRequest {
     /// Claude Code only: open this session (`claude --resume <id>`).
     #[serde(default)]
     pub session_id: Option<String>,
+    /// Claude Code only: start a new session with this id (`claude --session-id <uuid>`), so the
+    /// app knows which transcript the terminal writes.
+    #[serde(default)]
+    pub new_session_id: Option<String>,
+    /// Model alias or id for a vendor CLI (`--model`); none = the CLI's default.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Claude Code only: `--permission-mode` (the modes Chat offers).
+    #[serde(default)]
+    pub permission_mode: Option<String>,
 }
 
 /// The shell of this PC: PowerShell 7, else Windows PowerShell; `$SHELL`, else `sh`.
@@ -98,14 +109,37 @@ pub fn term_argv(req: &TermRequest, program_of: impl Fn(&str) -> Option<PathBuf>
     // A `.cmd` (npm's launcher) is a script: the command processor runs it.
     let lower = program.to_lowercase();
     let mut argv = if cfg!(windows) && (lower.ends_with(".cmd") || lower.ends_with(".bat")) { vec!["cmd.exe".into(), "/d".into(), "/c".into(), program] } else { vec![program] };
-    if let Some(id) = req.session_id.as_deref().filter(|s| !s.is_empty()) {
-        if preset.id != "claude" {
-            return Err("Only Claude Code opens a session by id".into());
+    // Every value below goes through `cmd.exe` for an npm launcher: only checked ids and names.
+    let given = |v: &Option<String>| v.as_deref().filter(|s| !s.is_empty()).map(str::to_string);
+    let claude_only = |what: &str| if preset.id == "claude" { Ok(()) } else { Err(format!("Only Claude Code takes {what}")) };
+    let (resume, new_id) = (given(&req.session_id), given(&req.new_session_id));
+    if resume.is_some() && new_id.is_some() {
+        return Err("Resume a session or start a new one, not both".into());
+    }
+    for (id, flag) in [(resume, "--resume"), (new_id, "--session-id")] {
+        if let Some(id) = id {
+            claude_only("a session id")?;
+            if !is_session_id(&id) {
+                return Err(format!("`{id}` is not a session id"));
+            }
+            argv.extend([flag.into(), id]);
         }
-        if !is_session_id(id) {
-            return Err(format!("`{id}` is not a session id"));
+    }
+    if let Some(m) = given(&req.model) {
+        if preset.id == SHELL {
+            return Err("A shell has no model".into());
         }
-        argv.extend(["--resume".into(), id.into()]);
+        if !is_model(&m) {
+            return Err(format!("`{m}` is not a model name"));
+        }
+        argv.extend(["--model".into(), m]);
+    }
+    if let Some(mode) = given(&req.permission_mode) {
+        claude_only("a permission mode")?;
+        if !PERMISSION_MODES.contains(&mode.as_str()) {
+            return Err(format!("`{mode}` is not a permission mode"));
+        }
+        argv.extend(["--permission-mode".into(), mode]);
     }
     Ok(argv)
 }
@@ -298,7 +332,7 @@ mod tests {
     use std::time::Duration;
 
     fn request(cwd: &Path, preset: &str) -> TermRequest {
-        TermRequest { preset: preset.into(), cwd: cwd.to_string_lossy().into_owned(), cols: 80, rows: 24, session_id: None }
+        TermRequest { preset: preset.into(), cwd: cwd.to_string_lossy().into_owned(), cols: 80, rows: 24, session_id: None, new_session_id: None, model: None, permission_mode: None }
     }
 
     #[test]
@@ -326,6 +360,29 @@ mod tests {
         assert!(bad(|r| r.session_id = Some("--dangerously-skip-permissions".into())), "an id cannot smuggle a flag");
         assert!(term_argv(&TermRequest { session_id: resume.session_id.clone(), ..request(dir.path(), "shell") }, exe).is_err(), "a shell has no sessions");
         assert!(term_argv(&TermRequest { session_id: Some(String::new()), ..request(dir.path(), "shell") }, exe).is_ok());
+
+        // Add agent: a new session with a known id, a model, a permission mode.
+        let id = "0c1d2e3f-aaaa-4bbb-8ccc-0123456789ab";
+        let hire = TermRequest { new_session_id: Some(id.into()), model: Some("opus".into()), permission_mode: Some("acceptEdits".into()), ..request(dir.path(), "claude") };
+        assert_eq!(term_argv(&hire, exe).unwrap()[1..], ["--session-id", id, "--model", "opus", "--permission-mode", "acceptEdits"]);
+        let gemini = TermRequest { model: Some("gemini-2.5-pro".into()), ..request(dir.path(), "gemini") };
+        assert_eq!(term_argv(&gemini, exe).unwrap()[1..], ["--model", "gemini-2.5-pro"]);
+        let with = |f: fn(&mut TermRequest)| {
+            let mut r = request(dir.path(), "claude");
+            f(&mut r);
+            term_argv(&r, exe)
+        };
+        assert!(with(|r| r.model = Some("opus & del *".into())).is_err(), "a model name cannot carry a command");
+        assert!(with(|r| r.permission_mode = Some("dontAsk".into())).is_err());
+        assert!(with(|r| r.new_session_id = Some("x".into())).is_err());
+        assert!(with(|r| {
+            r.session_id = Some("b522fcf1-505a-44f1-a1ca-e857b386b71c".into());
+            r.new_session_id = Some("0c1d2e3f-aaaa-4bbb-8ccc-0123456789ab".into());
+        })
+        .is_err(), "resume or new, not both");
+        assert!(term_argv(&TermRequest { model: Some("opus".into()), ..request(dir.path(), "shell") }, exe).is_err());
+        assert!(term_argv(&TermRequest { permission_mode: Some("plan".into()), ..request(dir.path(), "gemini") }, exe).is_err());
+        assert!(term_argv(&TermRequest { new_session_id: Some(id.into()), ..request(dir.path(), "gemini") }, exe).is_err());
     }
 
     #[test]
