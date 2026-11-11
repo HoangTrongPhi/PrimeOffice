@@ -8,7 +8,8 @@ files; everything it keeps is in `%LOCALAPPDATA%\com.phineas.primeoffice\`.
 | Agent | Where | Notes |
 |---|---|---|
 | Claude Code | `~/.claude/projects/<normalized cwd>/<session>.jsonl` | One JSON record per line. Used: `user` (prompt or `tool_result`), `assistant` (`text`, `tool_use`, `usage`, `model`, `stop_reason`), `system` `turn_duration`, `last-prompt`, `custom-title`, `agent-name`, `summary`; common fields `sessionId`, `cwd`, `entrypoint`, `timestamp`, `isSidechain`, `isMeta`. Unknown records are skipped. Normalized cwd = every char outside `[A-Za-z0-9-]` → `-` per UTF-16 unit. |
-| Codex, Gemini | `~/.codex/sessions`, `~/.gemini/tmp` | Only checked for existence (0.1) |
+| Codex CLI | `~/.codex/sessions/YYYY/MM/DD/rollout-<time>-<id>.jsonl` | One `{ timestamp, ordinal, type, payload }` record per line (verified on Codex CLI 0.167, 2026-11-11). Used: `session_meta` (`id`, `cwd`, `originator`), `turn_context` (`model`), `response_item` with `payload.type` = `message` (`role` user / assistant, text parts; user text starting with `<` is injected context), `custom_tool_call` / `function_call` / `local_shell_call` (`call_id`, `name`, `input` or `arguments`) and their `*_output`, `event_msg` with `payload.type` = `task_started`, `task_complete` (`last_agent_message`), `turn_aborted`, `token_count` (`info.last_token_usage.input_tokens`, `info.model_context_window`). Unknown records are skipped. A rollout belongs to a project when `session_meta.cwd` is that folder. `auth.json` and the SQLite files beside the sessions are never opened. |
+| Gemini | `~/.gemini/tmp` | Only checked for existence |
 
 ## Written by the app (`%LOCALAPPDATA%\com.phineas.primeoffice\`)
 

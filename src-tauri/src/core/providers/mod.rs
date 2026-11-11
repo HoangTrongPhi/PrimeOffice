@@ -1,5 +1,6 @@
 //! Agent providers: where a coding agent keeps its sessions and how to read them. Claude Code is
-//! complete; Codex (ChatGPT), Gemini and DeepSeek only report whether they are found (spec §3.3).
+//! complete, Codex (ChatGPT) reads its rollouts; Gemini and DeepSeek only report whether they are
+//! found (spec §3.3).
 //! A new agent is one more file here — the office, history and project check stay as they are.
 
 pub mod claude;

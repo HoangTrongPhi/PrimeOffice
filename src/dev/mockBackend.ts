@@ -125,7 +125,7 @@ let projects = [GAME, TOOLS, "D:\\Projects\\NewPrototype"];
 
 const PROVIDERS: ProviderStatus[] = [
   { id: "claude", name: "Claude Code", state: "active", sessionRoot: "C:\\Users\\me\\.claude\\projects", sessions: 3, observable: true, note: "CLI, Desktop app and IDE sessions (transcripts)" },
-  { id: "codex", name: "Codex CLI (ChatGPT)", state: "detected", sessionRoot: "C:\\Users\\me\\.codex\\sessions", sessions: 1, observable: false, note: "Session folder found; reading Codex rollouts comes in a later version" },
+  { id: "codex", name: "Codex CLI (ChatGPT)", state: "detected", sessionRoot: "C:\\Users\\me\\.codex\\sessions", sessions: 0, observable: true, note: "Codex CLI sessions (rollout files)" },
   { id: "gemini", name: "Gemini CLI", state: "notFound", sessionRoot: "C:\\Users\\me\\.gemini\\tmp", sessions: 0, observable: false, note: "Install Gemini CLI and run it once" },
   { id: "deepseek", name: "DeepSeek", state: "unsupported", sessionRoot: null, sessions: 0, observable: false, note: "No local session format yet; planned through the tool that runs DeepSeek" },
 ];

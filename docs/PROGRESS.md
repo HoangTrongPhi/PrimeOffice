@@ -1,8 +1,8 @@
 # PrimeOffice — Progress
 
 ## Status
-- Current phase: 0.1.0 and 0.1.1 released; 0.2.0 (sub-agents, departments, Game studio floor plan) built in
-  `release/0.2.0` on 2026-11-10 — the user commits, pushes and publishes the GitHub release themself
+- Current phase: 0.2.0 released 2026-11-10 (sub-agents, departments, Game studio floor plan); files in
+  `release/0.2.0`; the user commits, pushes and publishes GitHub releases themself
 - Last session: 2026-11-09 — app built from the template: Rust observer + providers + project check + CLI,
   vendored pixel-agents office in an iframe, Projects / History / Agents modules, generated character crew
 - `npm run check`: green (35 Rust tests, typecheck, 19/19 commands mocked); `npm run build` green
@@ -27,7 +27,12 @@
   [ ] push Abyss (catalog) — the agent's auto mode blocks creating public repos/releases, so the user runs these
 - [x] In-app Help / Hướng dẫn (F1, header "?", palette; VI / EN, `src/help/topics.ts` on `@abyss/ui` `HelpPanel`)
   added 2026-11-09 after the 0.1.0 build — not in `release/0.1.0`
-- [ ] P6 Codex / Gemini sessions (formats to verify on a PC that has them)
+- [ ] P6 Codex / Gemini sessions — [x] Codex rollouts (`providers/codex.rs`, 2026-11-11: parser + project match by
+  `session_meta.cwd`, 5 tests, tried with `history C:\Users\<me>` on a real Codex 0.167 rollout; not yet seen as a
+  character in the office window — no live Codex session at the time) [ ] Gemini CLI (not installed on this PC)
+  [ ] Antigravity (`~/.gemini/antigravity/conversations`, protobuf/SQLite, not read)
+- [ ] Munder Difflin integration — plan and ToS boundary in `docs/INTEGRATION_PLAN.md` (M1 = P6, M2 usage limits,
+  M3+ launching agents needs the user's go-ahead: it ends "observe only")
 - [ ] P7 Optional Claude hooks via `primeoffice.exe hook` (exact permission bubbles)
 
 ## Decisions (answers to the spec's open questions)

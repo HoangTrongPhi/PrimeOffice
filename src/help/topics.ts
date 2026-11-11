@@ -52,7 +52,7 @@ const gettingStarted: HelpTopic = {
       tips(
         ["Một tiến trình nền kiểm tra **mỗi giây** các transcript thay đổi trong khoảng **Active in** (mặc định 30 phút) và chỉ đọc các dòng mới. Session nào im lâu hơn khoảng đó thì nhân vật rời văn phòng.", "A background observer checks **every second** for transcripts that changed within the **Active in** window (30 minutes by default) and reads only the new lines. When a session stays quiet longer than that, its character leaves the office."],
         ["Không dùng hook, không sửa `~/.claude/settings.json`, không khởi chạy hay điều khiển agent, không gửi gì lên mạng.", "No hooks, no change to `~/.claude/settings.json`, it never launches or steers an agent, and nothing is sent over the network."],
-        ["Codex (`~/.codex/sessions`) và Gemini (`~/.gemini/tmp`) hiện chỉ được kiểm tra xem thư mục có tồn tại không — chúng chưa vào văn phòng (xem chủ đề **Agents**).", "Codex (`~/.codex/sessions`) and Gemini (`~/.gemini/tmp`) are only checked for existence today — they do not join the office yet (see the **Agents** topic)."],
+        ["Session Codex CLI (`~/.codex/sessions`) được đọc giống Claude và vào văn phòng. Gemini (`~/.gemini/tmp`) hiện chỉ được kiểm tra xem thư mục có tồn tại không — chưa vào văn phòng (xem chủ đề **Agents**).", "Codex CLI sessions (`~/.codex/sessions`) are read like Claude's and join the office. Gemini (`~/.gemini/tmp`) is only checked for existence today — it does not join the office yet (see the **Agents** topic)."],
         ["Trạng thái **chờ quyền** (permission) là **phỏng đoán** từ transcript: một tool chưa xong và im hơn 10 giây. Lệnh chạy lâu (Bash, PowerShell), subtask và tìm web không bị đoán như vậy.", "**Waiting for permission** is a **guess** from the transcript: a tool that has not finished and has been quiet for over 10 seconds. Long-running commands (Bash, PowerShell), subtasks and web lookups are never guessed as waiting."],
       ),
     ),
@@ -427,7 +427,7 @@ const history: HelpTopic = {
       tips(
         ["Thả một thư mục vào tab History để vừa mở project vừa lọc History theo nó.", "Drop a folder on the History tab to open it as a project and filter History to it at once."],
         ["**Idle** dựa trên khoảng **Active in** của Office: session cũ hơn khoảng đó là Idle.", "**Idle** uses the Office's **Active in** window: sessions older than that are Idle."],
-        ["Chỉ session Claude Code hiện ở đây; Codex và Gemini sẽ có sau. History chỉ đọc transcript, không xoá hay sửa gì.", "Only Claude Code sessions appear here; Codex and Gemini come later. History only reads transcripts; it never deletes or edits anything."],
+        ["Session Claude Code và Codex CLI hiện ở đây; Gemini sẽ có sau. History chỉ đọc transcript, không xoá hay sửa gì.", "Claude Code and Codex CLI sessions appear here; Gemini comes later. History only reads transcripts; it never deletes or edits anything."],
         ["Lựa chọn Project / Show không được nhớ khi mở lại ứng dụng.", "The Project / Show choice is not remembered when the app restarts."],
       ),
     ),
@@ -458,7 +458,7 @@ const providers: HelpTopic = {
       "Each agent",
       tips(
         ["**Claude Code**: hỗ trợ đầy đủ — `~/.claude/projects`, gồm session CLI, Desktop app và IDE. **Not found**: chạy `claude` một lần để tạo thư mục.", "**Claude Code**: fully supported — `~/.claude/projects`, CLI, Desktop app and IDE sessions. **Not found**: run `claude` once to create the folder."],
-        ["**Codex CLI (ChatGPT)**: chỉ kiểm tra `~/.codex/sessions`; đọc session sẽ có ở bản sau.", "**Codex CLI (ChatGPT)**: only `~/.codex/sessions` is checked; reading its sessions comes in a later version."],
+        ["**Codex CLI (ChatGPT)**: đọc các file rollout trong `~/.codex/sessions` — prompt, lệnh chạy, file sửa, câu trả lời cuối, context đã dùng. Chưa đoán trạng thái chờ quyền. **Not found**: chạy `codex` một lần.", "**Codex CLI (ChatGPT)**: reads the rollout files in `~/.codex/sessions` — prompts, commands, edited files, the last reply, context used. Waiting for permission is not guessed yet. **Not found**: run `codex` once."],
         ["**Gemini CLI**: chỉ kiểm tra `~/.gemini/tmp`; đọc session sẽ có ở bản sau.", "**Gemini CLI**: only `~/.gemini/tmp` is checked; reading its sessions comes in a later version."],
         ["**DeepSeek**: luôn **Planned** — chưa có định dạng session cục bộ; sẽ đi qua công cụ chạy DeepSeek.", "**DeepSeek**: always **Planned** — no local session format yet; it will come through the tool that runs DeepSeek."],
       ),
