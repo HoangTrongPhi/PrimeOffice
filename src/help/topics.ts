@@ -70,7 +70,7 @@ const gettingStarted: HelpTopic = {
       "Bố cục giao diện",
       "Layout",
       tips(
-        ["**Thanh điều hướng (cột trái)**: 4 tab theo thứ tự Ctrl+1 … Ctrl+4 — **Office**, **Projects**, **History**, **Agents**. Phía dưới: **Settings** (Ctrl+,), **About & contact**, **Command palette** (Ctrl+K) và **Show log / Hide log** (có huy hiệu đếm lỗi khi log đang đóng).", "**Navigation rail (left)**: the 4 tabs, in the order of Ctrl+1 … Ctrl+4 — **Office**, **Projects**, **History**, **Agents**. At the bottom: **Settings** (Ctrl+,), **About & contact**, **Command palette** (Ctrl+K) and **Show log / Hide log** (with an error count while the log is closed)."],
+        ["**Thanh điều hướng (cột trái)**: 6 tab theo thứ tự Ctrl+1 … Ctrl+6 — **Office**, **Chat**, **Projects**, **History**, **Agents**, **Terminal**. Phía dưới: **Settings** (Ctrl+,), **About & contact**, **Command palette** (Ctrl+K) và **Show log / Hide log** (có huy hiệu đếm lỗi khi log đang đóng).", "**Navigation rail (left)**: the 6 tabs, in the order of Ctrl+1 … Ctrl+6 — **Office**, **Chat**, **Projects**, **History**, **Agents**, **Terminal**. At the bottom: **Settings** (Ctrl+,), **About & contact**, **Command palette** (Ctrl+K) and **Show log / Hide log** (with an error count while the log is closed)."],
         ["**Header**: `PrimeOffice / <tab>`, ô **Search actions…** (mở Command Palette), nút **?** (hướng dẫn này), nhãn phiên bản (`browser preview` khi chạy ngoài app desktop — khi đó không đọc được dữ liệu thật) và `via Abyss` khi được Abyss khởi chạy.", "**Header**: `PrimeOffice / <tab>`, the **Search actions…** box (opens the command palette), the **?** button (this guide), the version pill (`browser preview` outside the desktop app — no real data is read there) and `via Abyss` when Abyss launched it."],
         ["**Log (dưới đáy)**: nhật ký của giao diện và phần Rust (project đã kiểm tra, layout đã lưu, lỗi…). Bật / tắt bằng Ctrl+`; Ctrl+K → **Clear log** để xoá.", "**Log (bottom)**: messages from the UI and the Rust side (projects checked, layout saved, errors…). Toggle it with Ctrl+`; Ctrl+K → **Clear log** empties it."],
       ),
@@ -96,14 +96,14 @@ const gettingStarted: HelpTopic = {
       keys(
         ["F1", "Mở / đóng hướng dẫn này (đúng chủ đề của tab đang mở)", "Open / close this guide (on the current tab's topic)"],
         ["Ctrl+K", "Command Palette: chuyển tab, mở thư mục, chạy lại, cập nhật, log, cài đặt…", "Command palette: tabs, open a folder, run again, updates, log, settings…"],
-        ["Ctrl+1 … Ctrl+5", "Chuyển tab (Office, Chat, Projects, History, Agents)", "Switch tab (Office, Chat, Projects, History, Agents)"],
+        ["Ctrl+1 … Ctrl+6", "Chuyển tab (Office, Chat, Projects, History, Agents, Terminal)", "Switch tab (Office, Chat, Projects, History, Agents, Terminal)"],
         ["Ctrl+O", "Mở thư mục project (như khi thả vào tab đang mở)", "Open a project folder (as if dropped on the current tab)"],
         ["F5", "Chạy lại tab hiện tại: Office làm mới danh sách agent, Projects kiểm tra lại project đang chọn, History tải lại, Agents dò lại. Không bao giờ ghi file", "Run the current tab again: Office refreshes the agent list, Projects re-checks the selected project, History reloads, Agents detects again. Never writes anything"],
         ["Ctrl+`", "Hiện / ẩn log", "Show / hide the log"],
         ["Ctrl+,", "Settings (giao diện)", "Settings (appearance)"],
         ["Esc", "Đóng hộp thoại / Command Palette / hướng dẫn", "Close a dialog / the command palette / this guide"],
       ),
-      tips(["Khi bạn vừa bấm vào văn phòng, phím được gửi tới văn phòng: chỉ `F1` được chuyển ra ngoài. Bấm vào header hoặc danh sách bên phải trước khi dùng Ctrl+K, Ctrl+1…5 hay F5. Phím của trình chỉnh sửa layout nằm trong chủ đề **Office — layout editor**.", "Right after you click in the office, keys go to the office: only `F1` is passed on. Click the header or the list on the right before using Ctrl+K, Ctrl+1…5 or F5. The layout editor's keys are in the **Office — layout editor** topic."]),
+      tips(["Khi bạn vừa bấm vào văn phòng, phím được gửi tới văn phòng: chỉ `F1` được chuyển ra ngoài. Bấm vào header hoặc danh sách bên phải trước khi dùng Ctrl+K, Ctrl+1…6 hay F5. Phím của trình chỉnh sửa layout nằm trong chủ đề **Office — layout editor**.", "Right after you click in the office, keys go to the office: only `F1` is passed on. Click the header or the list on the right before using Ctrl+K, Ctrl+1…6 or F5. The layout editor's keys are in the **Office — layout editor** topic."]),
     ),
     section(
       "Giao diện và cập nhật",
@@ -523,7 +523,7 @@ const chat: HelpTopic = {
       "How to use it",
       tips(
         ["Chọn **Folder** (thư mục project — của studio đang mở trước), gõ yêu cầu, **Enter** để gửi (**Shift+Enter** xuống dòng). Câu trả lời hiện dần; mỗi tool agent dùng là một dòng (đang chạy, xong, lỗi).", "Pick a **Folder** (a project folder — the open studio's first), write the task, **Enter** to send (**Shift+Enter** for a new line). The reply streams in; each tool the agent uses is a line (running, done, failed)."],
-        ["Cột trái là các **session Claude Code của thư mục đó** — gồm cả session bạn mở từ terminal hay Claude Desktop. Bấm một session để **nối tiếp** nó; **New session** để bắt đầu mới. Khi nối tiếp chỉ hiện lượt trao đổi cuối, nhưng agent có toàn bộ cuộc trò chuyện.", "The left column lists the **folder's Claude Code sessions** — including the ones you started in a terminal or Claude Desktop. Click one to **continue** it; **New session** starts fresh. Continuing shows only the last exchange, but the agent has the whole conversation."],
+        ["Cột trái là các **session Claude Code của thư mục đó** — gồm cả session bạn mở từ terminal hay Claude Desktop. Bấm một session để **nối tiếp** nó; **New session** để bắt đầu mới. Khi nối tiếp, Chat đọc transcript và hiện **toàn bộ cuộc trò chuyện** (lời nhắn, câu trả lời, các tool); cuộc trò chuyện rất dài thì hiện phần cuối.", "The left column lists the **folder's Claude Code sessions** — including the ones you started in a terminal or Claude Desktop. Click one to **continue** it; **New session** starts fresh. Continuing reads the transcript and shows the **whole conversation** (prompts, replies, tools); a very long one shows its end."],
         ["**Stop** dừng lượt đang chạy. Lượt vẫn chạy khi bạn sang tab khác; nhân vật của session xuất hiện trong Office như mọi session.", "**Stop** ends the running turn. A turn keeps running while you are on another tab; the session's character appears in Office like any session."],
         ["Đừng gửi tin cho **cùng một session** từ hai nơi cùng lúc (Chat và Claude Desktop): hai bên sẽ ghi chồng lên nhau.", "Do not message the **same session** from two places at once (Chat and Claude Desktop): they would write over each other."],
       ),
@@ -549,4 +549,41 @@ const chat: HelpTopic = {
   ],
 };
 
-export const HELP_TOPICS: HelpTopic[] = [gettingStarted, office, officeLayout, session, chat, projects, history, providers, cli];
+// ---------------------------------------------------------------- Terminal
+
+const terminal: HelpTopic = {
+  id: "terminal",
+  title: { vi: "Terminal — CLI của agent ngay trong app", en: "Terminal — the agent's CLI inside the app" },
+  summary: {
+    vi: "Terminal thật chạy Claude Code, Codex, Gemini hoặc shell trong thư mục project — cho những việc cần màn hình của chính CLI: đăng nhập, /resume, lệnh slash, trả lời hỏi quyền.",
+    en: "A real terminal running Claude Code, Codex, Gemini or the shell in a project folder — for what needs the CLI's own screen: signing in, /resume, slash commands, answering permission prompts.",
+  },
+  sections: [
+    section(
+      "Cách dùng",
+      "How to use it",
+      tips(
+        ["Chọn **Folder**, rồi bấm một nút ở **New terminal**: **Claude Code**, **Codex**, **Gemini** hoặc **Shell** (PowerShell). Nút mờ nghĩa là CLI đó chưa cài — rê chuột để xem lệnh cài.", "Pick a **Folder**, then click a button under **New terminal**: **Claude Code**, **Codex**, **Gemini** or **Shell** (PowerShell). A greyed button means that CLI is not installed — hover it for the install command."],
+        ["Mỗi terminal là một tab; mở được tối đa 8 cái. Chấm xanh: đang chạy; **ended**: chương trình đã thoát (màn hình vẫn còn để đọc). **×** kết thúc terminal và đóng tab.", "Each terminal is a tab; up to 8 at once. Green dot: running; **ended**: the program has exited (its screen stays readable). **×** ends the terminal and closes its tab."],
+        ["Terminal vẫn chạy khi bạn sang tab khác. Đóng PrimeOffice thì mọi terminal kết thúc.", "A terminal keeps running while you are on another tab. Closing PrimeOffice ends every terminal."],
+        ["Trong **Chat**, nút **Terminal** mở Claude Code ở thư mục đang chọn — và mở đúng session đang xem (`claude --resume`) nếu có. Đừng nhắn cho cùng một session từ Chat và Terminal cùng lúc.", "In **Chat**, the **Terminal** button opens Claude Code in the chosen folder — on the session on screen (`claude --resume`) when there is one. Do not message the same session from Chat and Terminal at once."],
+        ["Session chạy trong Terminal là session bình thường của CLI: nhân vật của nó xuất hiện trong **Office**, và nó có trong **History**.", "A session run in Terminal is an ordinary session of that CLI: its character appears in **Office** and it is listed in **History**."],
+      ),
+    ),
+    section(
+      "Phím",
+      "Keys",
+      keys(["Ctrl+C", "Sao chép khi đang bôi chọn; không thì gửi Ctrl+C cho chương trình", "Copies when text is selected; otherwise sends Ctrl+C to the program"], ["Ctrl+V", "Dán", "Paste"], ["Ctrl+1 … Ctrl+6", "Vẫn chuyển tab của app", "Still switch the app's tabs"]),
+      tips(["Khi con trỏ ở trong terminal, các phím Ctrl khác (Ctrl+K, Ctrl+O, Ctrl+`…) thuộc về chương trình đang chạy, không mở bảng lệnh hay log của app.", "While the cursor is in a terminal, the other Ctrl keys (Ctrl+K, Ctrl+O, Ctrl+`…) belong to the running program; they do not open the app's palette or log."]),
+    ),
+    section(
+      "Tài khoản",
+      "Your account",
+      tips(
+        ["Terminal chạy **chính CLI của hãng** như một cửa sổ terminal: bạn gõ, CLI trả lời. Đăng nhập bằng luồng của CLI (`/login` trong Claude Code). PrimeOffice chỉ chuyển phím và chữ qua lại — không đọc token, không gõ thay bạn.", "Terminal runs **the vendor's own CLI** like a terminal window: you type, the CLI answers. Sign in with the CLI's own flow (`/login` in Claude Code). PrimeOffice only passes keys and text through — it reads no token and does not type for you."],
+      ),
+    ),
+  ],
+};
+
+export const HELP_TOPICS: HelpTopic[] = [gettingStarted, office, officeLayout, session, chat, projects, history, providers, terminal, cli];

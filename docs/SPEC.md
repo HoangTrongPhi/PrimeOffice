@@ -135,7 +135,7 @@ src/office/transport/tauriTransport.ts   MessageTransport: listen("office://mess
 
 ## 5. UI
 
-Rail (template): **Office** (`Ctrl+1`), **Projects** (`Ctrl+2`), **History** (`Ctrl+3`), **Providers** (`Ctrl+4`).
+Rail (template): **Office** (`Ctrl+1`), **Chat** (`Ctrl+2`), **Projects** (`Ctrl+3`), **History** (`Ctrl+4`), **Agents** (`Ctrl+5`), **Terminal** (`Ctrl+6`).
 
 - **Office**: canvas văn phòng + thanh dưới (zoom, edit layout, filter theo project) + panel phải khi chọn nhân vật (U3).
 - **Projects**: nút Open folder, danh sách project đã mở (pill Ready / Missing N), báo cáo chuẩn dạng checklist

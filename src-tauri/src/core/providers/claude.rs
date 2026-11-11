@@ -343,6 +343,132 @@ impl SessionParser for ClaudeParser {
     }
 }
 
+/// One entry of a conversation as Chat shows it; the same shape as `ChatItem` in `src/lib/chatEvents.ts`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum TalkItem {
+    User { text: String },
+    Assistant { text: String, streaming: bool },
+    Tool { id: String, name: String, label: String, done: bool, error: bool },
+    Notice { tone: &'static str, text: String },
+}
+
+/// A session's conversation for Chat (`chat_history`).
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Conversation {
+    pub items: Vec<TalkItem>,
+    /// The transcript is longer than what was read or kept: `items` is its end.
+    pub truncated: bool,
+}
+
+/// Bytes read from the end of a transcript for its conversation, and entries kept.
+pub const TALK_BYTES: u64 = 8 * 1024 * 1024;
+pub const TALK_ITEMS: usize = 1_000;
+/// One prompt or reply is cut to this many characters.
+const TALK_TEXT_MAX: usize = 20_000;
+
+/// The main conversation in transcript lines: prompts, replies and tool calls in order. Sub-agent
+/// records, reminders and command output are left out, as in the session summary.
+pub fn conversation_from_lines<'a>(lines: impl IntoIterator<Item = &'a str>) -> Vec<TalkItem> {
+    let mut items: Vec<TalkItem> = Vec::new();
+    let prompt = |items: &mut Vec<TalkItem>, text: String| {
+        if text.starts_with("[Request interrupted") {
+            items.push(TalkItem::Notice { tone: "info", text: "Interrupted.".into() });
+        } else {
+            items.push(TalkItem::User { text: clip(&text, TALK_TEXT_MAX) });
+        }
+    };
+    for line in lines {
+        let Ok(rec) = serde_json::from_str::<Value>(line) else { continue };
+        let flag = |k: &str| rec.get(k).and_then(Value::as_bool) == Some(true);
+        if flag("isSidechain") || flag("isMeta") {
+            continue;
+        }
+        let content = rec.pointer("/message/content");
+        match rec.get("type").and_then(Value::as_str) {
+            Some("user") if flag("isCompactSummary") => items.push(TalkItem::Notice { tone: "info", text: "The conversation above was compacted here.".into() }),
+            Some("user") => match content {
+                Some(Value::String(s)) => {
+                    if let Some(t) = prompt_text(s) {
+                        prompt(&mut items, t);
+                    }
+                }
+                Some(Value::Array(parts)) => {
+                    let mut text = String::new();
+                    for p in parts {
+                        match p.get("type").and_then(Value::as_str) {
+                            Some("tool_result") => {
+                                let id = p.get("tool_use_id").and_then(Value::as_str).unwrap_or("");
+                                let failed = p.get("is_error").and_then(Value::as_bool) == Some(true);
+                                if let Some(TalkItem::Tool { done, error, .. }) = items.iter_mut().rev().find(|it| matches!(it, TalkItem::Tool { id: i, .. } if i == id)) {
+                                    (*done, *error) = (true, failed);
+                                }
+                            }
+                            Some("text") => {
+                                if let Some(t) = p.get("text").and_then(Value::as_str).and_then(prompt_text) {
+                                    if !text.is_empty() {
+                                        text.push('\n');
+                                    }
+                                    text.push_str(&t);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    if !text.is_empty() {
+                        prompt(&mut items, text);
+                    }
+                }
+                _ => {}
+            },
+            Some("assistant") => {
+                for p in content.and_then(Value::as_array).into_iter().flatten() {
+                    match p.get("type").and_then(Value::as_str) {
+                        Some("text") => {
+                            let t = p.get("text").and_then(Value::as_str).unwrap_or("").trim();
+                            if !t.is_empty() {
+                                items.push(TalkItem::Assistant { text: clip(t, TALK_TEXT_MAX), streaming: false });
+                            }
+                        }
+                        Some("tool_use") => {
+                            let id = p.get("id").and_then(Value::as_str).unwrap_or("");
+                            let name = p.get("name").and_then(Value::as_str).unwrap_or("tool");
+                            if !id.is_empty() && !items.iter().any(|it| matches!(it, TalkItem::Tool { id: i, .. } if i == id)) {
+                                let (_, label) = describe(name, p.get("input").unwrap_or(&Value::Null));
+                                items.push(TalkItem::Tool { id: id.into(), name: name.into(), label, done: false, error: false });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    // What is read back is over: nothing is shown as still running.
+    for it in &mut items {
+        if let TalkItem::Tool { done, .. } = it {
+            *done = true;
+        }
+    }
+    items
+}
+
+/// The conversation of the transcript at `path`: all of it, or its end when it is longer than
+/// `TALK_BYTES` / `TALK_ITEMS`.
+pub fn conversation(path: &Path) -> Result<Conversation, crate::core::CoreError> {
+    let len = std::fs::metadata(path).map_err(|e| crate::core::CoreError::io(path, e))?.len();
+    let (lines, _) = super::read_lines_from(path, len.saturating_sub(TALK_BYTES))?;
+    let mut items = conversation_from_lines(lines.iter().map(String::as_str));
+    let mut truncated = len > TALK_BYTES;
+    if items.len() > TALK_ITEMS {
+        items.drain(..items.len() - TALK_ITEMS);
+        truncated = true;
+    }
+    Ok(Conversation { items, truncated })
+}
+
 pub struct ClaudeProvider {
     root: PathBuf,
 }
@@ -468,6 +594,87 @@ pub mod fixtures {
 mod tests {
     use super::fixtures::*;
     use super::*;
+
+    #[test]
+    fn conversation_keeps_prompts_replies_and_tools_in_order() {
+        let at = "2026-11-09T06:00:00Z";
+        let failed = serde_json::json!({ "type": "user", "sessionId": "s1", "timestamp": at, "message": { "role": "user", "content": [{ "type": "tool_result", "tool_use_id": "t2", "is_error": true, "content": "exit 1" }] } }).to_string();
+        let side = serde_json::json!({ "type": "assistant", "isSidechain": true, "message": { "content": [{ "type": "text", "text": "sub-agent talk" }] } }).to_string();
+        let compact = serde_json::json!({ "type": "user", "isCompactSummary": true, "message": { "role": "user", "content": "This session is being continued…" } }).to_string();
+        let lines = [
+            user("Fix the build", at),
+            user("<system-reminder>not a prompt</system-reminder>", at),
+            tool_use("t1", "Read", serde_json::json!({ "file_path": "D:\\Game\\src\\main.rs" }), at),
+            tool_use("t1", "Read", serde_json::json!({ "file_path": "D:\\Game\\src\\main.rs" }), at),
+            tool_result("t1", at),
+            tool_use("t2", "Bash", serde_json::json!({ "command": "cargo build" }), at),
+            failed,
+            side,
+            "not json".to_string(),
+            reply("Fixed.", at),
+            compact,
+            user("[Request interrupted by user]", at),
+            user("Now the tests", at),
+            tool_use("t3", "Edit", serde_json::json!({ "file_path": "a.rs" }), at),
+        ];
+        let items = conversation_from_lines(lines.iter().map(String::as_str));
+        let tool = |id: &str, name: &str, label: &str, error: bool| TalkItem::Tool { id: id.into(), name: name.into(), label: label.into(), done: true, error };
+        assert_eq!(
+            items,
+            [
+                TalkItem::User { text: "Fix the build".into() },
+                tool("t1", "Read", "Reading main.rs", false),
+                tool("t2", "Bash", "Running: cargo build", true),
+                TalkItem::Assistant { text: "Fixed.".into(), streaming: false },
+                TalkItem::Notice { tone: "info", text: "The conversation above was compacted here.".into() },
+                TalkItem::Notice { tone: "info", text: "Interrupted.".into() },
+                TalkItem::User { text: "Now the tests".into() },
+                tool("t3", "Edit", "Editing a.rs", false),
+            ]
+        );
+        // The JSON is what `ChatItem` in src/lib/chatEvents.ts expects.
+        assert_eq!(serde_json::to_value(&items[1]).unwrap(), serde_json::json!({ "kind": "tool", "id": "t1", "name": "Read", "label": "Reading main.rs", "done": true, "error": false }));
+        assert_eq!(serde_json::to_value(&items[3]).unwrap(), serde_json::json!({ "kind": "assistant", "text": "Fixed.", "streaming": false }));
+        assert_eq!(serde_json::to_value(&items[5]).unwrap(), serde_json::json!({ "kind": "notice", "tone": "info", "text": "Interrupted." }));
+    }
+
+    /// A real transcript, by hand: `PRIMEOFFICE_TRANSCRIPT=<file> cargo test real_transcript -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn real_transcript_conversation() {
+        let path = std::env::var("PRIMEOFFICE_TRANSCRIPT").expect("PRIMEOFFICE_TRANSCRIPT");
+        let talk = conversation(Path::new(&path)).unwrap();
+        let count = |f: fn(&TalkItem) -> bool| talk.items.iter().filter(|it| f(it)).count();
+        println!(
+            "{} items (truncated: {}): {} prompts, {} replies, {} tools, {} notices",
+            talk.items.len(),
+            talk.truncated,
+            count(|it| matches!(it, TalkItem::User { .. })),
+            count(|it| matches!(it, TalkItem::Assistant { .. })),
+            count(|it| matches!(it, TalkItem::Tool { .. })),
+            count(|it| matches!(it, TalkItem::Notice { .. })),
+        );
+        for it in talk.items.iter().take(6) {
+            println!("{}", one_line(&serde_json::to_string(it).unwrap(), 160));
+        }
+        assert!(!talk.items.is_empty());
+    }
+
+    #[test]
+    fn conversation_of_a_long_transcript_is_its_end() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("s1.jsonl");
+        let at = "2026-11-09T06:00:00Z";
+        let text: String = (0..TALK_ITEMS + 5).map(|i| user(&format!("prompt {i}"), at) + "\n").collect();
+        std::fs::write(&path, text).unwrap();
+        let talk = conversation(&path).unwrap();
+        assert!(talk.truncated);
+        assert_eq!(talk.items.len(), TALK_ITEMS);
+        assert_eq!(talk.items.last(), Some(&TalkItem::User { text: format!("prompt {}", TALK_ITEMS + 4) }));
+        std::fs::write(&path, user("only one", at) + "\n").unwrap();
+        assert_eq!(conversation(&path).unwrap(), Conversation { items: vec![TalkItem::User { text: "only one".into() }], truncated: false });
+        assert!(conversation(&dir.path().join("missing.jsonl")).is_err());
+    }
     use serde_json::json;
 
     const T0: &str = "2026-11-09T06:00:00.000Z";

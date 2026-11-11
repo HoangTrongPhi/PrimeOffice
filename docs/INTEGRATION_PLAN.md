@@ -75,9 +75,9 @@ sát"); M4 và M5 chưa hỏi.
 |---|---|---|
 | M3a | **Chat**: tab giao việc, mỗi cuộc trò chuyện là một session Claude Code (`claude -p … --resume`), nối tiếp được session mở từ terminal / Desktop | Xong 2026-11-11 |
 | M3b | Chat cho Codex (`codex exec --json`, `codex exec resume`) và Gemini — sau khi tra điều khoản OpenAI / Google và kiểm chứng định dạng | Chưa |
-| M3c | Hỏi quyền ngay trong Chat (thay cho "từ chối"): `--permission-prompt-tool` hoặc hook Claude (= P7) | Chưa |
-| M3d | Xem lại toàn bộ cuộc trò chuyện của session đang nối tiếp (đọc transcript đầy đủ) | Chưa |
-| M3e | Terminal thật cho agent (PTY `portable-pty` + xterm) cho việc cần TUI: `/login`, `/resume`, lệnh slash | Chưa |
+| M3c | Hỏi quyền ngay trong Chat (thay cho "từ chối"): `--permission-prompt-tool` hoặc hook Claude (= P7) | Dừng: chưa kiểm chứng được giao thức (xem PROGRESS) |
+| M3d | Xem lại toàn bộ cuộc trò chuyện của session đang nối tiếp (đọc transcript đầy đủ) | Xong 2026-11-11 (`chat_history`) |
+| M3e | Terminal thật cho agent (PTY `portable-pty` + xterm) cho việc cần TUI: `/login`, `/resume`, lệnh slash | Xong 2026-11-11 (tab Terminal, `term_cmd.rs`) |
 | M3f | Git worktree cho từng agent; chạy song song nhiều cuộc trò chuyện | Chưa |
 
 Claude Desktop: session tạo từ Chat mở được trong Desktop bằng `/resume` ở ô nhập, nhưng không tự hiện ở danh sách

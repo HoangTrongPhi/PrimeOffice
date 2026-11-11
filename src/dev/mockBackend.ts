@@ -194,6 +194,12 @@ function playChatTurn(chatId: number, sessionId: string, model: string, prompt: 
   chatTimers.set(chatId, timers);
 }
 
+// ---------------------------------------------------------------- terminal (term_cmd): a line echo
+
+let termSeq = 0;
+const mockTerms = new Map<number, { line: string; cwd: string }>();
+const termPrompt = (cwd: string) => `\x1b[32mPS ${cwd}>\x1b[0m `;
+
 /** Studios (studios.json in the real backend). */
 const STUDIOS_KEY = "primeoffice.mock-studios";
 const DEFAULT_STUDIOS: Studios = { active: "main", studios: [{ id: "main", name: "Game studio", kind: "game", projects: [] }] };
@@ -442,6 +448,76 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
           const chatId = ++chatSeq;
           playChatTurn(chatId, req.sessionId || "0c1d2e3f-aaaa-4bbb-8ccc-0123456789ab", req.model || "claude-opus-5-5", req.prompt);
           return chatId;
+        }
+        case "term_presets":
+          return [
+            { id: "claude", label: "Claude Code", found: true, path: "C:\\Users\\me\\.local\\bin\\claude.exe", hint: "Install Claude Code: https://code.claude.com/docs/en/setup" },
+            { id: "codex", label: "Codex", found: true, path: "C:\\Users\\me\\AppData\\Roaming\\npm\\codex.cmd", hint: "Install Codex CLI: npm install -g @openai/codex" },
+            { id: "gemini", label: "Gemini", found: false, path: null, hint: "Install Gemini CLI: npm install -g @google/gemini-cli" },
+            { id: "shell", label: "Shell", found: true, path: "powershell.exe", hint: "" },
+          ];
+        case "term_open": {
+          const req = (a.request ?? {}) as { preset?: string; cwd?: string; cols?: number; rows?: number; sessionId?: string | null };
+          const termId = ++termSeq;
+          mockTerms.set(termId, { line: "", cwd: req.cwd ?? GAME });
+          const what = req.preset === "shell" ? "Windows PowerShell (mock)" : `${req.preset} (mock)${req.sessionId ? ` — resumed session ${req.sessionId.slice(0, 8)}` : ""}`;
+          setTimeout(() => void emit("term://event", { termId, data: `\x1b[1;36m${what}\x1b[0m  ${req.cols}×${req.rows}\r\nType a line and press Enter; \x1b[33mexit\x1b[0m ends it.\r\n\r\n${termPrompt(req.cwd ?? GAME)}` }), 150);
+          return termId;
+        }
+        case "term_write": {
+          const t = mockTerms.get(a.termId);
+          if (!t) return false;
+          let out = "";
+          for (const ch of String(a.data)) {
+            if (ch === "\r") {
+              const line = t.line.trim();
+              t.line = "";
+              if (line === "exit") {
+                mockTerms.delete(a.termId);
+                void emit("term://event", { termId: a.termId, data: out + "\r\n" });
+                void emit("term://event", { termId: a.termId, exit: 0 });
+                return true;
+              }
+              out += `\r\n${line ? `you typed: ${line}\r\n` : ""}${termPrompt(t.cwd)}`;
+            } else if (ch === "\x7f") {
+              if (t.line) {
+                t.line = t.line.slice(0, -1);
+                out += "\b \b";
+              }
+            } else if (ch >= " ") {
+              t.line += ch;
+              out += ch;
+            }
+          }
+          if (out) void emit("term://event", { termId: a.termId, data: out });
+          return true;
+        }
+        case "term_resize":
+          return mockTerms.has(a.termId);
+        case "term_close": {
+          if (!mockTerms.delete(a.termId)) return false;
+          void emit("term://event", { termId: a.termId, exit: null });
+          return true;
+        }
+
+        case "chat_history": {
+          await sleep(400);
+          const s = HISTORY.find((x) => x.transcriptPath === a.path);
+          if (!s) throw `${a.path} is not a Claude Code session`;
+          const file = `${GAME}\\src\\InventoryGrid.tsx`;
+          return {
+            truncated: s.promptCount > 5,
+            items: [
+              { kind: "user", text: `First, look at how ${s.title || "this"} is set up.` },
+              { kind: "tool", id: "h-1", name: "Read", label: "Reading InventoryGrid.tsx", done: true, error: false },
+              { kind: "tool", id: "h-2", name: "Bash", label: "Running: npm test", done: true, error: true },
+              { kind: "assistant", text: `I read ${file}. One test fails: the slot index is off by one.`, streaming: false },
+              { kind: "notice", tone: "info", text: "The conversation above was compacted here." },
+              ...(s.lastPrompt ? [{ kind: "user", text: s.lastPrompt }] : []),
+              { kind: "tool", id: "h-3", name: "Edit", label: "Editing InventoryGrid.tsx", done: true, error: false },
+              ...(s.lastReply ? [{ kind: "assistant", text: s.lastReply, streaming: false }] : []),
+            ],
+          };
         }
         case "chat_stop": {
           const live = chatTimers.get(a.chatId);

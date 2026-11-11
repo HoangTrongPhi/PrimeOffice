@@ -1,6 +1,6 @@
 import { CommandPalette, LogDrawer } from "@abyss/ui";
 import { Loader2 } from "lucide-react";
-import { Suspense, useMemo, type ComponentType } from "react";
+import { lazy, Suspense, useMemo, type ComponentType } from "react";
 import { AppAbout } from "./components/layout/AppAbout";
 import { AppHelp } from "./components/layout/AppHelp";
 import { HeaderBar } from "./components/layout/HeaderBar";
@@ -19,12 +19,16 @@ import { errorText, uiLog, useAppStore } from "./stores/appStore";
 import type { TabId } from "./types/primeoffice";
 
 // Heavy modules (three.js, uPlot, big canvases) go in with lazy(() => import(…)) to keep startup light.
+// xterm is only loaded when the Terminal tab is first opened.
+const TerminalTab = lazy(() => import("./components/tabs/TerminalTab").then((m) => ({ default: m.TerminalTab })));
+
 const TABS: Record<TabId, ComponentType> = {
   office: OfficeTab,
   chat: ChatTab,
   projects: ProjectsTab,
   history: HistoryTab,
   providers: ProvidersTab,
+  terminal: TerminalTab,
 };
 
 export default function App() {
@@ -45,7 +49,7 @@ export default function App() {
       <NavigationRail />
       <div className="flex min-w-0 flex-1 flex-col">
         <HeaderBar />
-        <main className={activeTab === "office" || activeTab === "chat" || activeTab === "history" || activeTab === "projects" ? "min-h-0 flex-1 overflow-hidden" : "min-h-0 flex-1 overflow-y-auto"}>
+        <main className={activeTab !== "providers" ? "min-h-0 flex-1 overflow-hidden" : "min-h-0 flex-1 overflow-y-auto"}>
           <Suspense
             fallback={
               <div className="grid h-full place-items-center text-ink-faint">

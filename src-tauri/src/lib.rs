@@ -21,6 +21,7 @@ fn configure<R: Runtime>(builder: Builder<R>, open_with: Option<Result<std::path
         .manage(JobRegistry::default())
         .manage(commands::office_cmd::OfficeState::default())
         .manage(commands::chat_cmd::ChatState::default())
+        .manage(commands::term_cmd::TermState::default())
         .manage(commands::app_cmd::StartupFolder::new(startup_folder))
         .setup(move |app| {
             logbus::emit(
@@ -62,6 +63,12 @@ fn configure<R: Runtime>(builder: Builder<R>, open_with: Option<Result<std::path
             commands::chat_cmd::chat_cli,
             commands::chat_cmd::chat_send,
             commands::chat_cmd::chat_stop,
+            commands::chat_cmd::chat_history,
+            commands::term_cmd::term_presets,
+            commands::term_cmd::term_open,
+            commands::term_cmd::term_write,
+            commands::term_cmd::term_resize,
+            commands::term_cmd::term_close,
         ])
 }
 

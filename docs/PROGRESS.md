@@ -6,7 +6,7 @@
   releases themself
 - Last session: 2026-11-09 — app built from the template: Rust observer + providers + project check + CLI,
   vendored pixel-agents office in an iframe, Projects / History / Agents modules, generated character crew
-- `npm run check`: green (35 Rust tests, typecheck, 19/19 commands mocked); `npm run build` green
+- `npm run check`: green 2026-11-11 (66 Rust tests, 11 TS tests, typecheck, 30/30 commands mocked); `npm run build` green
 - Seen in the Browser pane in `?mock` (office with 3 agents, agent detail, projects checklist, history) — no console errors
 - CLI tried on real data: `check P:\…\Coral`, `history P:\…\Gogo_Gadgets`, `providers`
 - Real window checked 2026-11-09 (`tauri build --debug --no-bundle`, embedded frontend + real CSP, inspected over
@@ -40,7 +40,7 @@
   Ctrl+3…5). Checked: 4 Rust tests + 4 node tests; `?mock` (send, tools, streamed reply, session list); the real
   CLI 2.1.319 through `spawn_turn` (`cargo test real_cli -- --ignored`: second turn resumed the first one's
   session and kept its context). Not yet tried in the real window. Limits: Claude Code only; a turn cannot ask
-  for permission (refused calls are reported); a continued session shows only its last exchange; one
+  for permission (refused calls are reported); one
   conversation at a time; Claude Desktop needs `/resume` to open a Chat session (not in its sidebar).
 - [ ] M3c Permission prompts in Chat — started 2026-11-11, paused by the user until their plan's usage resets (the
   5-hour window was at 91%). Found so far on Claude Code 2.1.319: `--permission-mode` now takes `manual` (not
@@ -51,6 +51,37 @@
   Next: rerun that probe (scratch script `perm_probe2.py` is gone with the session; it sends one user record on
   stdin and answers `control_request` with a `control_response` allow), then keep stdin open per turn in
   `spawn_turn`, emit the request as a chat item with Allow / Deny, and write the answer back.
+  2026-11-11 (later the same day): the probe could not be rerun. On Claude Code 2.1.322 a turn started with
+  `--input-format stream-json --permission-prompt-tool stdio --permission-mode manual` ended at once with "Your
+  organization has disabled Claude subscription access for Claude Code · Use an Anthropic API key instead, or ask
+  your admin to enable access" (`claude auth status`: logged in). That is the account's policy, so it was left
+  alone — and it means Chat itself (M3a) cannot run a turn on this account until that changes. The
+  control_request / control_response shapes are still unverified; do not build on them before a probe passes.
+  (From a shell started by Claude Desktop the CLI says "Not logged in": the host's `CLAUDE_CODE_*` /
+  `ANTHROPIC_BASE_URL` variables are inherited; a clean environment shows the real state.)
+- [x] M3d Whole conversation in Chat (2026-11-11) — `chat_history` (`providers::claude::conversation`): prompts,
+  replies and tool calls of the main conversation from the transcript, in the shape of the frontend's `ChatItem`;
+  the end of the file when it is over 8 MB / 1,000 entries (`truncated`); only `.jsonl` files inside
+  `~/.claude/projects` are read. `openSession` shows the last exchange at once, then replaces it. Checked: 3 new
+  Rust tests, one real transcript by hand (`real_transcript_conversation`, 1.4 MB → 45 entries), typecheck,
+  25/25 commands mocked, `?mock` (open a session: prompts, tools incl. a failed one, the compaction note; no
+  console errors). Not yet tried in the real window. Texts are cut at 20,000 characters; sub-agent talk and tool
+  output are not shown.
+- [x] M3e Terminal (2026-11-11) — tab Terminal (Ctrl+6): `term_cmd.rs` on `portable-pty` 0.9 (ConPTY) with
+  `term_presets / term_open / term_write / term_resize / term_close` and `term://event`; presets claude, codex,
+  gemini, shell (pwsh, else powershell.exe); an npm `.cmd` launcher runs through `cmd.exe /d /c`; at most 8
+  terminals. Frontend: `termStore.ts`, xterm screens in `lib/termScreens.ts` (loaded with the tab, alive while
+  the terminal is), `TerminalTab.tsx`; Chat's **Terminal** button opens `claude --resume <session>`. Checked: 6 new
+  Rust tests (a real console in `spawn_pty`, a real shell through the IPC commands), typecheck, 30/30 commands
+  mocked, `?mock`, and the real window (`tauri build --debug --no-bundle`, driven over WebView2's DevTools port):
+  PowerShell ran a typed line, Claude Code 2.1.322's TUI drew at the fitted size (41 rows) through `claude.cmd`,
+  `exit` showed "ended with code 0", × closed the tab; no console errors. Notes: ConPTY asks `ESC[6n` at the start
+  and waits for the answer — xterm gives it, so a screen must exist before `term_open` (it does); portable-pty's
+  Windows `kill()` reports success as an error, so its result is ignored. Not done: Codex / Gemini are not installed
+  here (their buttons were only seen disabled); no restore of terminals after an app restart; a terminal opened by
+  the Chat button on a session Chat is also using is not prevented (only disabled while a turn runs). The preset
+  table is the cut-down "preset provider" of the plan (no model / resume flags beyond Claude's `--resume`, no
+  custom command, no Antigravity).
 - [x] Studios (2026-11-11, asked by the user: "each tab a company for one field, its own skill set later") — tab
   strip in Office, `studio_cmd.rs` (`studios.json`, `layout-<id>.json`), kinds in `src/lib/studios.ts`, Video
   studio plan (`gen-studio-layout.py` now builds every plan; game-studio.json unchanged byte for byte) and video

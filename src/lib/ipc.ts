@@ -6,6 +6,7 @@ import type {
   AppInfo,
   ChatCli,
   ChatEvent,
+  ChatHistory,
   ChatRequest,
   LogEntry,
   OfficeAgent,
@@ -16,6 +17,9 @@ import type {
   ProviderStatus,
   SessionQuery,
   Studios,
+  TermEvent,
+  TermPreset,
+  TermRequest,
 } from "../types/primeoffice";
 
 /** False in a plain browser (`npm run dev` without `?mock`): backend calls are skipped. */
@@ -25,6 +29,7 @@ export const EVENTS = {
   log: "log://entry",
   office: "office://message",
   chat: "chat://event",
+  term: "term://event",
 } as const;
 
 export const ipc = {
@@ -61,6 +66,16 @@ export const ipc = {
   /** One message to an agent; answers the chat id its `chat://event`s carry. */
   chatSend: (request: ChatRequest) => invoke<number>("chat_send", { request }),
   chatStop: (chatId: number) => invoke<boolean>("chat_stop", { chatId }),
+  /** The whole conversation of a Claude Code session, by transcript path. */
+  chatHistory: (path: string) => invoke<ChatHistory>("chat_history", { path }),
+
+  /** What a terminal can start on this PC (vendor CLIs, the shell). */
+  termPresets: () => invoke<TermPreset[]>("term_presets"),
+  /** Open a terminal; answers the id its `term://event`s carry. */
+  termOpen: (request: TermRequest) => invoke<number>("term_open", { request }),
+  termWrite: (termId: number, data: string) => invoke<boolean>("term_write", { termId, data }),
+  termResize: (termId: number, cols: number, rows: number) => invoke<boolean>("term_resize", { termId, cols, rows }),
+  termClose: (termId: number) => invoke<boolean>("term_close", { termId }),
 };
 
 export const on = {
@@ -69,4 +84,6 @@ export const on = {
   office: (cb: (msgs: OfficeMessage[]) => void): Promise<UnlistenFn> => listen<OfficeMessage[]>(EVENTS.office, (e) => cb(e.payload)),
   /** Records of a running chat turn, then its end. */
   chat: (cb: (e: ChatEvent) => void): Promise<UnlistenFn> => listen<ChatEvent>(EVENTS.chat, (e) => cb(e.payload)),
+  /** Output of the open terminals, and their ends. */
+  term: (cb: (e: TermEvent) => void): Promise<UnlistenFn> => listen<TermEvent>(EVENTS.term, (e) => cb(e.payload)),
 };

@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Runtime, State};
 
+use crate::core::providers::claude::{self, Conversation};
 use crate::core::providers::home_dir;
 use crate::utils::logbus::{self, Level};
 
@@ -66,7 +67,7 @@ pub struct ChatState {
     running: Arc<Mutex<HashMap<u64, Running>>>,
 }
 
-fn is_session_id(s: &str) -> bool {
+pub(crate) fn is_session_id(s: &str) -> bool {
     s.len() == 36 && s.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
 }
 
@@ -76,11 +77,23 @@ fn is_model(s: &str) -> bool {
 
 /// The Claude Code CLI: on `PATH`, else where its installers put it (`~/.local/bin`, npm's global bin).
 pub fn find_claude(path_var: Option<&std::ffi::OsStr>, home: Option<&Path>, appdata: Option<&Path>) -> Option<PathBuf> {
-    let names: &[&str] = if cfg!(windows) { &["claude.exe", "claude.cmd"] } else { &["claude"] };
+    find_program("claude", path_var, home, appdata)
+}
+
+/// A command line tool by name (`claude`, `codex`, …): on `PATH`, else in `~/.local/bin` and npm's
+/// global bin. On Windows that is `<name>.exe`, then the `<name>.cmd` npm writes.
+pub fn find_program(name: &str, path_var: Option<&std::ffi::OsStr>, home: Option<&Path>, appdata: Option<&Path>) -> Option<PathBuf> {
+    let names: Vec<String> = if cfg!(windows) { vec![format!("{name}.exe"), format!("{name}.cmd")] } else { vec![name.to_string()] };
     let mut dirs: Vec<PathBuf> = path_var.map(|p| std::env::split_paths(p).collect()).unwrap_or_default();
     dirs.extend(home.map(|h| h.join(".local").join("bin")));
     dirs.extend(appdata.map(|a| a.join("npm")));
     dirs.iter().flat_map(|d| names.iter().map(move |n| d.join(n))).find(|p| p.is_file())
+}
+
+/// `find_program` with this process's `PATH`, home and `APPDATA`.
+pub fn installed(name: &str) -> Option<PathBuf> {
+    let appdata = std::env::var_os("APPDATA").map(PathBuf::from);
+    find_program(name, std::env::var_os("PATH").as_deref(), home_dir().as_deref(), appdata.as_deref())
 }
 
 fn claude_cli() -> Option<PathBuf> {
@@ -224,10 +237,51 @@ pub fn chat_stop(chat: State<'_, ChatState>, chat_id: u64) -> Result<bool, Strin
     Ok(killed)
 }
 
+/// A transcript Chat may read: a `.jsonl` file inside `root` (Claude Code's `projects` folder).
+pub fn transcript_in(root: &Path, path: &Path) -> Result<PathBuf, String> {
+    let no = || format!("{} is not a Claude Code session", path.display());
+    if !path.extension().is_some_and(|x| x.eq_ignore_ascii_case("jsonl")) {
+        return Err(no());
+    }
+    // Resolved first, so `..` and links cannot point outside the folder.
+    let (root, file) = (root.canonicalize().map_err(|_| no())?, path.canonicalize().map_err(|_| no())?);
+    if file.is_file() && file.starts_with(&root) {
+        Ok(file)
+    } else {
+        Err(no())
+    }
+}
+
+/// The whole conversation of a session, to show when Chat continues it (its end when it is very long).
+#[tauri::command]
+pub async fn chat_history(path: String) -> Result<Conversation, String> {
+    let root = home_dir().ok_or("No home folder")?.join(".claude").join("projects");
+    tauri::async_runtime::spawn_blocking(move || {
+        let file = transcript_in(&root, Path::new(&path))?;
+        claude::conversation(&file).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::mpsc;
+
+    #[test]
+    fn reads_only_transcripts_inside_the_projects_folder() {
+        let (home, other) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+        let dir = home.path().join("D--Game");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("s1.jsonl"), "").unwrap();
+        std::fs::write(dir.join("notes.txt"), "").unwrap();
+        std::fs::write(other.path().join("s2.jsonl"), "").unwrap();
+        assert!(transcript_in(home.path(), &dir.join("s1.jsonl")).is_ok());
+        assert!(transcript_in(home.path(), &dir.join("notes.txt")).is_err(), "not a transcript");
+        assert!(transcript_in(home.path(), &dir.join("missing.jsonl")).is_err());
+        assert!(transcript_in(home.path(), &other.path().join("s2.jsonl")).is_err(), "outside the folder");
+    }
 
     fn request(cwd: &Path) -> ChatRequest {
         ChatRequest { cwd: cwd.to_string_lossy().into_owned(), prompt: "Fix the build".into(), session_id: None, model: None, permission_mode: None }

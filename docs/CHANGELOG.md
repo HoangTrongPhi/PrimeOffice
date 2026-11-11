@@ -4,6 +4,16 @@ All user-visible changes. Newest first; one section per released version.
 
 ## Unreleased
 
+- **Terminal** (new tab, Ctrl+6): real terminals inside PrimeOffice. Pick a folder and start **Claude Code**, **Codex**,
+  **Gemini** or the **Shell** there — the CLI itself, as in a terminal window, for signing in (`/login`), `/resume`,
+  slash commands and permission prompts. Up to 8 terminals as tabs; they keep running while another tab is shown.
+  Chat has a **Terminal** button that opens the session on screen in one (`claude --resume`).
+- Chat: warning and error notices now have their colours (amber / red).
+
+- **Chat**: continuing a session now shows its whole conversation — prompts, replies and tool calls, read from the
+  session's transcript — instead of only the last exchange. A very long conversation shows its end (the last 1,000
+  entries of the last 8 MB).
+
 ## 0.3.0 — 2026-11-11
 
 - **Chat** (new tab, Ctrl+2): give an agent work from PrimeOffice. Each conversation is an ordinary Claude Code

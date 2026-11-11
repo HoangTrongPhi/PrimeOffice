@@ -35,6 +35,8 @@ interface ChatState {
   view: ChatView;
   /** Title of the session on screen ("" for a new one). */
   title: string;
+  /** The conversation of the session just opened is still being read. */
+  loadingHistory: boolean;
   /** Chat id of the turn that is running, null when idle. */
   running: number | null;
   /** The running turn was stopped by the user. */
@@ -46,7 +48,7 @@ interface ChatState {
   checkCli: () => Promise<void>;
   loadSessions: () => Promise<void>;
   newSession: () => void;
-  /** Continue an existing session: its last prompt and reply are shown as the starting point. */
+  /** Continue an existing session: its conversation is read from the transcript and shown. */
   openSession: (session: AgentSession) => void;
   send: (prompt: string) => Promise<void>;
   stop: () => Promise<void>;
@@ -63,12 +65,13 @@ export const useChatStore = create<ChatState>()(
       loadingSessions: false,
       view: emptyChat(),
       title: "",
+      loadingHistory: false,
       running: null,
       stopping: false,
       cli: null,
       setCwd: (cwd) => {
         if (get().running !== null || cwd === get().cwd) return;
-        set({ cwd, sessions: [], view: emptyChat(), title: "" });
+        set({ cwd, sessions: [], view: emptyChat(), title: "", loadingHistory: false });
         void get().loadSessions();
       },
       setModel: (model) => set({ model }),
@@ -96,23 +99,37 @@ export const useChatStore = create<ChatState>()(
         }
       },
       newSession: () => {
-        if (get().running === null) set({ view: emptyChat(), title: "" });
+        if (get().running === null) set({ view: emptyChat(), title: "", loadingHistory: false });
       },
       openSession: (s) => {
         if (get().running !== null) return;
         const view = emptyChat();
         view.sessionId = s.sessionId;
         view.model = s.model;
-        view.items.push({ kind: "notice", tone: "info", text: `Continuing this session (${s.promptCount} prompt${s.promptCount === 1 ? "" : "s"} so far). Only its last exchange is shown; the agent has the whole conversation.` });
+        // The last exchange right away (the list already has it), then the whole conversation.
         if (s.lastPrompt) view.items.push({ kind: "user", text: s.lastPrompt });
         if (s.lastReply) view.items.push({ kind: "assistant", text: s.lastReply, streaming: false });
-        set({ view, title: s.title });
+        set({ view, title: s.title, loadingHistory: true });
+        // Still the session that was opened, and nothing was sent in the meantime.
+        const current = () => get().view === view;
+        void ipc
+          .chatHistory(s.transcriptPath)
+          .then((h) => {
+            if (!current()) return;
+            const items = h.truncated ? [{ kind: "notice" as const, tone: "info" as const, text: "This is the end of a long conversation; the agent has the whole of it." }, ...h.items] : h.items;
+            set({ view: { ...view, items }, loadingHistory: false });
+          })
+          .catch((e) => {
+            if (!current()) return;
+            const note = { kind: "notice" as const, tone: "warn" as const, text: `Only the last exchange is shown (${errorText(e)}); the agent has the whole conversation.` };
+            set({ view: { ...view, items: [note, ...view.items] }, loadingHistory: false });
+          });
       },
       send: async (prompt) => {
         const { cwd, model, mode, view, running } = get();
         const text = prompt.trim();
         if (!inTauri || !cwd || !text || running !== null) return;
-        set({ view: { ...view, items: [...view.items, { kind: "user", text }] }, title: get().title || text.slice(0, 60), stopping: false });
+        set({ view: { ...view, items: [...view.items, { kind: "user", text }] }, title: get().title || text.slice(0, 60), stopping: false, loadingHistory: false });
         try {
           // A mode saved by an older version may no longer exist.
           const permissionMode = CHAT_MODES.some((m) => m.id === mode) ? mode : CHAT_MODES[0].id;

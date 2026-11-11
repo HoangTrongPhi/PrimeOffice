@@ -7,6 +7,7 @@ pub mod office_cmd;
 pub mod project_cmd;
 pub mod session_cmd;
 pub mod studio_cmd;
+pub mod term_cmd;
 
 /// The JSON the frontend sends (see `src/types/primeoffice.ts`) must decode into the command inputs.
 #[cfg(test)]

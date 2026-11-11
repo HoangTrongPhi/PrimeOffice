@@ -1,10 +1,12 @@
 import { EmptyState } from "@abyss/ui";
-import { AlertTriangle, Check, FolderOpen, Loader2, MessageSquarePlus, MessagesSquare, Send, Square, Wrench, X } from "lucide-react";
+import { AlertTriangle, Check, FolderOpen, Loader2, MessageSquarePlus, MessagesSquare, Send, Square, SquareTerminal, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { pickPaths } from "../../lib/dialogs";
 import type { ChatItem } from "../../lib/chatEvents";
 import { studioHasProject } from "../../lib/studios";
+import { useAppStore } from "../../stores/appStore";
 import { CHAT_MODELS, CHAT_MODES, useChatStore } from "../../stores/chatStore";
+import { useTermStore } from "../../stores/termStore";
 import { currentStudio, useProjectStore, useStudioStore } from "../../stores/dataStore";
 import { folderName, relTime, StatusPill } from "../session/SessionView";
 
@@ -28,14 +30,14 @@ function Item({ item }: { item: ChatItem }) {
     case "tool":
       return (
         <div className="flex items-center gap-2 text-[11.5px] text-ink-faint">
-          {!item.done ? <Loader2 className="size-3.5 shrink-0 animate-spin" /> : item.error ? <X className="size-3.5 shrink-0 text-danger" /> : <Check className="size-3.5 shrink-0" />}
+          {!item.done ? <Loader2 className="size-3.5 shrink-0 animate-spin" /> : item.error ? <X className="size-3.5 shrink-0 text-rose" /> : <Check className="size-3.5 shrink-0" />}
           <Wrench className="size-3 shrink-0" />
           <span className="truncate">{item.label}</span>
         </div>
       );
     case "notice":
       return (
-        <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px] ${item.tone === "error" ? "border-danger/40 text-danger" : item.tone === "warn" ? "border-warn/40 text-warn" : "border-edge text-ink-muted"}`}>
+        <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px] ${item.tone === "error" ? "border-rose/40 text-rose" : item.tone === "warn" ? "border-amber/40 text-amber" : "border-edge text-ink-muted"}`}>
           {item.tone !== "info" && <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />}
           <span className="whitespace-pre-wrap break-words">{item.text}</span>
         </div>
@@ -49,7 +51,7 @@ function Item({ item }: { item: ChatItem }) {
  * one that is open or starts a new one.
  */
 export function ChatTab() {
-  const { cwd, model, mode, sessions, loadingSessions, view, title, running, stopping, cli, setCwd, setModel, setMode, newSession, openSession, send, stop } = useChatStore();
+  const { cwd, model, mode, sessions, loadingSessions, view, title, loadingHistory, running, stopping, cli, setCwd, setModel, setMode, newSession, openSession, send, stop } = useChatStore();
   const projects = useProjectStore((s) => s.projects);
   // Re-render when the studio on screen changes: its folders come first.
   useStudioStore((s) => s.active);
@@ -117,19 +119,32 @@ export function ChatTab() {
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          className="btn"
+          disabled={!cwd || busy}
+          title={view.sessionId ? "Open this session in a real terminal (claude --resume): sign in with /login, slash commands, permission prompts" : "Open Claude Code in a real terminal in this folder: sign in with /login, /resume, slash commands"}
+          onClick={() => {
+            if (!cwd) return;
+            void useTermStore.getState().open("claude", cwd, view.sessionId);
+            useAppStore.getState().setActiveTab("terminal");
+          }}
+        >
+          <SquareTerminal className="size-3.5" /> Terminal
+        </button>
         <div className="flex-1" />
-        {view.limit && <span className="text-[11.5px] text-warn">Plan limit — {view.limit}</span>}
+        {view.limit && <span className="text-[11.5px] text-amber">Plan limit — {view.limit}</span>}
         <span className="text-[11.5px] text-ink-faint">Claude Code{view.model ? ` · ${view.model}` : ""}</span>
       </div>
 
       {cli && !cli.found && (
-        <div className="flex items-start gap-2 border-b border-warn/40 bg-warn/5 px-4 py-2 text-[12px] text-warn">
+        <div className="flex items-start gap-2 border-b border-amber/40 bg-amber/5 px-4 py-2 text-[12px] text-amber">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
           <span>Claude Code CLI not found. {cli.hint}</span>
         </div>
       )}
       {mode === "bypassPermissions" && (
-        <div className="flex items-start gap-2 border-b border-danger/40 bg-danger/5 px-4 py-2 text-[12px] text-danger">
+        <div className="flex items-start gap-2 border-b border-rose/40 bg-rose/5 px-4 py-2 text-[12px] text-rose">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
           <span>Full auto: the agent runs any command and changes any file without asking.</span>
         </div>
@@ -178,6 +193,11 @@ export function ChatTab() {
             ) : (
               <div className="mx-auto flex max-w-[860px] flex-col gap-3 px-6 py-5">
                 {title && <div className="truncate text-[11.5px] text-ink-faint">{title}</div>}
+                {loadingHistory && (
+                  <div className="flex items-center gap-2 text-[11.5px] text-ink-faint">
+                    <Loader2 className="size-3.5 animate-spin" /> Reading the conversation…
+                  </div>
+                )}
                 {view.items.map((item, i) => (
                   <Item key={i} item={item} />
                 ))}

@@ -1,4 +1,4 @@
-import { Building2, FolderCheck, History, MessagesSquare, PlugZap, type LucideIcon } from "lucide-react";
+import { Building2, FolderCheck, History, MessagesSquare, PlugZap, SquareTerminal, type LucideIcon } from "lucide-react";
 import type { TabId } from "../types/primeoffice";
 
 export interface ModuleDef {
@@ -19,6 +19,7 @@ export const MODULES: ModuleDef[] = [
   { id: "projects", label: "Projects", description: "Open a project folder and see what it is missing", icon: FolderCheck, hotkey: "3", accepts: "folder" },
   { id: "history", label: "History", description: "Recent sessions: last prompt, what was done, last reply", icon: History, hotkey: "4", accepts: "folder" },
   { id: "providers", label: "Agents", description: "Claude Code, Codex, Gemini, DeepSeek on this PC", icon: PlugZap, hotkey: "5", accepts: "folder" },
+  { id: "terminal", label: "Terminal", description: "A real terminal for an agent's CLI: sign in, /resume, slash commands", icon: SquareTerminal, hotkey: "6", accepts: "folder" },
 ];
 
 export const moduleById = (id: TabId) => MODULES.find((m) => m.id === id) ?? MODULES[0];

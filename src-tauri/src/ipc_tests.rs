@@ -164,6 +164,60 @@ fn chat_refuses_bad_requests_before_starting_anything() {
     assert!(h.invoke("chat_send", json!({ "request": { "cwd": s(dir.path()), "prompt": "   " } })).is_err());
     assert!(h.invoke("chat_send", json!({ "request": { "cwd": s(dir.path()), "prompt": "hi", "sessionId": "--flag", "model": null, "permissionMode": "manual" } })).is_err());
     assert_eq!(h.ok("chat_stop", json!({ "chatId": 999 })), false);
+    assert!(h.invoke("chat_history", json!({ "path": s(&dir.path().join("CLAUDE.md")) })).is_err(), "only Claude Code transcripts");
+}
+
+#[test]
+fn terminal_refuses_bad_requests_and_unknown_ids() {
+    let h = Harness::new();
+    let presets = h.ok("term_presets", json!({}));
+    assert_eq!(presets.as_array().unwrap().iter().map(|p| p["id"].as_str().unwrap()).collect::<Vec<_>>(), ["claude", "codex", "gemini", "shell"]);
+    let dir = project_tree();
+    // The JSON the terminal store sends; none of these starts anything.
+    assert!(h.invoke("term_open", json!({ "request": { "preset": "shell", "cwd": "Z:\\no\\such\\folder", "cols": 80, "rows": 24, "sessionId": null } })).is_err());
+    assert!(h.invoke("term_open", json!({ "request": { "preset": "cmd /c del", "cwd": s(dir.path()), "cols": 80, "rows": 24 } })).is_err());
+    assert!(h.invoke("term_open", json!({ "request": { "preset": "shell", "cwd": s(dir.path()), "cols": 0, "rows": 24 } })).is_err());
+    assert!(h.invoke("term_open", json!({ "request": { "preset": "shell", "cwd": s(dir.path()), "cols": 80, "rows": 24, "sessionId": "b522fcf1-505a-44f1-a1ca-e857b386b71c" } })).is_err());
+    assert_eq!(h.ok("term_write", json!({ "termId": 999, "data": "x" })), false);
+    assert_eq!(h.ok("term_resize", json!({ "termId": 999, "cols": 80, "rows": 24 })), false);
+    assert!(h.invoke("term_resize", json!({ "termId": 999, "cols": 80, "rows": 0 })).is_err());
+    assert_eq!(h.ok("term_close", json!({ "termId": 999 })), false);
+}
+
+/// A shell through the real commands: its output arrives as `term://event`s, typed keys reach it,
+/// closing it ends it.
+#[test]
+fn terminal_runs_the_shell() {
+    let h = Harness::new();
+    let events = h.listen("term://event");
+    let dir = project_tree();
+    let id = h.ok("term_open", json!({ "request": { "preset": "shell", "cwd": s(dir.path()), "cols": 100, "rows": 30, "sessionId": null } }));
+    let (mut text, mut typed, mut closed, mut exit) = (String::new(), false, false, None);
+    while let Ok(e) = events.recv_timeout(std::time::Duration::from_secs(60)) {
+        assert_eq!(e["termId"], id);
+        if let Some(d) = e["data"].as_str() {
+            // What xterm does in the app: answer the console's cursor question.
+            if d.contains("\u{1b}[6n") {
+                h.ok("term_write", json!({ "termId": id, "data": "\u{1b}[1;1R" }));
+            }
+            text.push_str(d);
+            if !typed {
+                typed = true;
+                assert_eq!(h.ok("term_resize", json!({ "termId": id, "cols": 120, "rows": 40 })), true);
+                assert_eq!(h.ok("term_write", json!({ "termId": id, "data": "echo prime-$(20+22)-office\r" })), true);
+            }
+            if !closed && text.contains("prime-42-office") {
+                closed = true;
+                assert_eq!(h.ok("term_close", json!({ "termId": id })), true);
+            }
+        } else if e.get("exit").is_some() {
+            exit = Some(e["exit"].clone());
+            break;
+        }
+    }
+    assert!(text.contains("prime-42-office"), "the shell ran the typed line: {text:?}");
+    assert!(exit.is_some(), "the end is reported");
+    assert_eq!(h.ok("term_write", json!({ "termId": id, "data": "x" })), false, "an ended terminal is gone");
 }
 
 #[test]

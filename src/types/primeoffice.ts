@@ -3,7 +3,7 @@ import type { AbyssContext } from "@abyss/ui";
 
 export type { LogEntry, LogLevel } from "@abyss/ui";
 
-export type TabId = "office" | "chat" | "projects" | "history" | "providers";
+export type TabId = "office" | "chat" | "projects" | "history" | "providers" | "terminal";
 
 export interface AppInfo {
   version: string;
@@ -175,6 +175,42 @@ export interface ChatEvent {
   chatId: number;
   line?: unknown;
   done?: { code: number | null; stderr: string };
+}
+
+/** `providers::claude::Conversation` (`chat_history`): a session's conversation read from its transcript. */
+export interface ChatHistory {
+  items: import("../lib/chatEvents").ChatItem[];
+  /** The transcript is longer than what is shown: `items` is its end. */
+  truncated: boolean;
+}
+
+// ---------------------------------------------------------------- terminal (commands::term_cmd)
+
+/** `term_cmd::TermPreset`: something a terminal can start, and whether it is installed. */
+export interface TermPreset {
+  /** `claude` | `codex` | `gemini` | `shell`. */
+  id: string;
+  label: string;
+  found: boolean;
+  path: string | null;
+  hint: string;
+}
+
+/** `term_cmd::TermRequest`. */
+export interface TermRequest {
+  preset: string;
+  cwd: string;
+  cols: number;
+  rows: number;
+  /** Claude Code only: the session to open (`claude --resume <id>`). */
+  sessionId?: string | null;
+}
+
+/** Payload of `term://event`: output of a terminal, or its end (`exit`: the code, null when unknown). */
+export interface TermEvent {
+  termId: number;
+  data?: string;
+  exit?: number | null;
 }
 
 /** `chat_cmd::ChatCli`. */
