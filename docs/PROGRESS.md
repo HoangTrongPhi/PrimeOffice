@@ -1,9 +1,10 @@
 # PrimeOffice — Progress
 
 ## Status
-- Current phase: 0.3.0 built 2026-11-11 on the user's request (Chat, Studios + Video studio, Codex sessions); files
-  in `release/0.3.0`; not published. 0.2.0 was released 2026-11-10. The user commits, pushes and publishes GitHub
-  releases themself
+- Current phase: 0.4.0 (Office control room, Terminal tab, Chat whole conversation) — version set and pushed
+  2026-11-11 (`b355f16`); the user publishes it with the GitHub Actions workflow **Release** (needs the
+  `TAURI_SIGNING_PRIVATE_KEY` secret; the key is not on this PC and `gh` is not installed). 0.3.0 was released
+  2026-11-11. The user commits, pushes and publishes GitHub releases themself
 - Last session: 2026-11-09 — app built from the template: Rust observer + providers + project check + CLI,
   vendored pixel-agents office in an iframe, Projects / History / Agents modules, generated character crew
 - `npm run check`: green 2026-11-11 (66 Rust tests, 11 TS tests, typecheck, 30/30 commands mocked); `npm run build` green
