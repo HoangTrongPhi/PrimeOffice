@@ -4,6 +4,8 @@ All user-visible changes. Newest first; one section per released version.
 
 ## Unreleased
 
+## 0.4.0 — 2026-11-11
+
 - **Office, laid out as a control room**: the floor on the left, a sidebar on the right (drag to size it) and an
   **agent strip** under the floor — one card per agent with its state, name, what it does, folder, CLI and context.
   - **Add agent** (end of the strip): a four-part form — **Identity** (name), **Workspace** (folder; continue a
