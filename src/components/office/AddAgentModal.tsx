@@ -1,12 +1,13 @@
 import { Modal } from "@abyss/ui";
-import { Briefcase, Cpu, FolderOpen, IdCard, Play, type LucideIcon } from "lucide-react";
+import { Briefcase, Cpu, Crown, FolderOpen, IdCard, Play, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { BRIEFING_FILE, firstMessage, ROLES, type Role } from "../../lib/briefing";
 import { pickPaths } from "../../lib/dialogs";
 import { inTauri, ipc } from "../../lib/ipc";
 import { studioHasProject } from "../../lib/studios";
 import { CHAT_MODELS, CHAT_MODES } from "../../stores/chatStore";
-import { currentStudio, useProjectStore, useStudioStore } from "../../stores/dataStore";
-import { selectTerm, useOfficeUi } from "../../stores/officeUiStore";
+import { currentStudio, useOfficeStore, useProjectStore, useStudioStore } from "../../stores/dataStore";
+import { agentName, folderKey, selectTerm, useOfficeUi } from "../../stores/officeUiStore";
 import { useTermStore } from "../../stores/termStore";
 import type { AgentSession } from "../../types/primeoffice";
 import { folderName, relTime } from "../session/SessionView";
@@ -16,7 +17,7 @@ const SECTIONS: { id: Section; label: string; hint: string; icon: LucideIcon }[]
   { id: "identity", label: "Identity", hint: "name", icon: IdCard },
   { id: "workspace", label: "Workspace", hint: "folder · resume", icon: FolderOpen },
   { id: "engine", label: "Engine", hint: "CLI · model · permissions", icon: Cpu },
-  { id: "briefing", label: "Briefing", hint: "first task", icon: Briefcase },
+  { id: "briefing", label: "Briefing", hint: "role · task", icon: Briefcase },
 ];
 
 /** Starting points for the first task. */
@@ -47,7 +48,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
  * the first task.
  */
 export function AddAgentModal() {
-  const { addOpen, setAddOpen } = useOfficeUi();
+  const { addOpen, setAddOpen, names, bosses } = useOfficeUi();
   const presets = useTermStore((s) => s.presets);
   const projects = useProjectStore((s) => s.projects);
   useStudioStore((s) => s.active);
@@ -61,7 +62,19 @@ export function AddAgentModal() {
   const [resume, setResume] = useState("");
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [task, setTask] = useState("");
+  const [taskName, setTaskName] = useState("");
+  const [role, setRole] = useState<Role>("boss");
+  const [rolePicked, setRolePicked] = useState(false);
   const [busy, setBusy] = useState(false);
+  const bossId = cwd ? bosses[folderKey(cwd)] : undefined;
+  const bossSession = useOfficeStore((s) => s.agents.find((a) => a.session.sessionId === bossId)?.session);
+  const bossTerm = useTermStore((s) => s.tabs.find((t) => t.sessionId === bossId));
+  const bossName = !bossId ? "" : bossSession ? agentName(bossSession, names, bossTerm) : names[bossId] || bossTerm?.name || "";
+
+  // The first agent of a folder is its Boss; the ones after it are members (until the user picks).
+  useEffect(() => {
+    if (addOpen && !rolePicked) setRole(bossId ? "member" : "boss");
+  }, [addOpen, rolePicked, bossId]);
 
   // A fresh form each time it opens; the first folder of the studio, the first installed CLI.
   useEffect(() => {
@@ -71,6 +84,8 @@ export function AddAgentModal() {
     setName("");
     setResume("");
     setTask("");
+    setTaskName("");
+    setRolePicked(false);
     setModel("");
     setMode("");
     setBusy(false);
@@ -113,11 +128,16 @@ export function AddAgentModal() {
     .filter(Boolean)
     .join(" ");
 
+  // A shell is not an agent: it gets the task as written.
+  const briefing = { role: shell ? ("solo" as Role) : role, name, bossName, taskName, task };
+  const message = firstMessage(briefing);
+
   const start = async () => {
     if (!ready) return;
     setBusy(true);
     useTermStore.getState().setCwd(cwd);
-    const key = await useTermStore.getState().open({
+    const terms = useTermStore.getState();
+    const key = await terms.open({
       preset,
       cwd,
       name,
@@ -125,8 +145,16 @@ export function AddAgentModal() {
       newSession: claude && !resume,
       model: shell ? null : model || null,
       permissionMode: claude ? mode || null : null,
-      firstTask: task,
+      firstTask: message,
     });
+    // Kept by session, so the name, the task and the Boss role outlive the terminal tab.
+    const sessionId = key !== null ? useTermStore.getState().tabs.find((t) => t.key === key)?.sessionId : null;
+    if (sessionId) {
+      const ui = useOfficeUi.getState();
+      if (name.trim()) ui.setName(sessionId, name);
+      if (taskName.trim()) ui.setTask(sessionId, taskName);
+      if (briefing.role === "boss") ui.setBoss(cwd, sessionId);
+    }
     setAddOpen(false);
     if (key !== null) selectTerm(key);
   };
@@ -280,6 +308,41 @@ export function AddAgentModal() {
 
           {section === "briefing" && (
             <>
+              {!shell && (
+                <Row
+                  label="Role"
+                  hint={
+                    role === "member" && !bossId
+                      ? `This folder has no Boss yet: nobody keeps ${BRIEFING_FILE}. Add a Boss first, or pick Boss here.`
+                      : role === "boss" && bossId
+                        ? `This replaces ${bossName || "the current Boss"} as the Boss of the folder.`
+                        : role === "boss" && !claude
+                          ? "Only a Claude Code agent keeps the Boss label in the office; the briefing text is typed in all the same."
+                          : (ROLES.find((r) => r.id === role)?.text ?? "")
+                  }
+                >
+                  <div className="flex gap-1.5">
+                    {ROLES.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        title={r.text}
+                        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12.5px] ${r.id === role ? "border-accent bg-accent/10 text-ink" : "border-edge text-ink-muted hover:bg-tint/4"}`}
+                        onClick={() => {
+                          setRole(r.id);
+                          setRolePicked(true);
+                        }}
+                      >
+                        {r.id === "boss" && <Crown className="size-3.5" />}
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </Row>
+              )}
+              <Row label="Task name (optional)" hint="Shown under the agent's name in the office, instead of the folder. Empty: the session's title.">
+                <input className={FIELD} value={taskName} maxLength={60} placeholder="e.g. task001, Inventory UI" onChange={(e) => setTaskName(e.target.value)} />
+              </Row>
               <Row label="Templates">
                 <div className="flex flex-wrap gap-1.5">
                   {TEMPLATES.map((t) => (
@@ -297,6 +360,11 @@ export function AddAgentModal() {
                   onChange={(e) => setTask(e.target.value)}
                 />
               </Row>
+              {message && message !== task.trim() && (
+                <Row label="What is typed in" hint="The role's text, the task name, then your first task — sent as one message.">
+                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-edge bg-canvas/40 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-ink-muted">{message}</pre>
+                </Row>
+              )}
             </>
           )}
         </div>

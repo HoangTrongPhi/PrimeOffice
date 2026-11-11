@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { areaTiersFor, departmentOf, isDirector, isEditorTool, normalizeLabel, subagentLabel, venueAreas } from "../../src/office/webview/src/office/engine/departments.ts";
+import { areaTiersFor, briefer, departmentOf, directorAreas, isDirector, isEditorTool, normalizeLabel, subagentLabel, tierOf, venueAreas } from "../../src/office/webview/src/office/engine/departments.ts";
 
 test("every UEHF / CCGS agent has a department", () => {
   const roster = ["accessibility-specialist", "ai-programmer", "analytics-engineer", "art-director", "audio-director", "community-manager", "creative-director", "devops-engineer", "economy-designer", "engine-programmer", "game-designer", "gameplay-programmer", "lead-programmer", "level-designer", "live-ops-designer", "localization-lead", "narrative-director", "network-programmer", "performance-analyst", "producer", "prototyper", "qa-lead", "qa-tester", "release-manager", "security-engineer", "sound-designer", "systems-designer", "technical-artist", "technical-director", "tools-programmer", "ue-blueprint-specialist", "ue-gas-specialist", "ue-replication-specialist", "ue-umg-specialist", "ui-programmer", "unreal-specialist", "ux-designer", "world-builder", "writer", "godot-gdscript-specialist", "unity-dots-specialist", "unity-specialist"];
@@ -26,11 +26,15 @@ test("area labels match departments loosely", () => {
   assert.deepEqual(areaTiersFor("writer", [...labels, "Narrative"], { "agent:writer": ["Engine lab"] }), [["writer"], ["Engine lab"], ["Narrative"]]);
 });
 
-test("the studio floor plan has an area for every department", () => {
-  const layout = JSON.parse(readFileSync(new URL("../../public/assets/layouts/game-studio.json", import.meta.url), "utf8"));
-  const labels = layout.areas.map((a: { label: string }) => a.label);
+const GAME_THEMES = ["game-campus.json", "game-open.json"];
+const areasOf = (file: string): string[] => JSON.parse(readFileSync(new URL(`../../public/assets/layouts/${file}`, import.meta.url), "utf8")).areas.map((a: { label: string }) => a.label);
+
+test("both game studio themes have an area for every department", () => {
+  for (const file of GAME_THEMES) {
+  const labels = areasOf(file);
   for (const t of ["creative-director", "game-designer", "lead-programmer", "unreal-specialist", "art-director", "audio-director", "writer", "qa-lead", "release-manager", "community-manager"]) {
-    assert.equal(areaTiersFor(t, labels, {}).length, 1, t);
+    assert.equal(areaTiersFor(t, labels, {}).length, 1, `${file} ${t}`);
+  }
   }
 });
 
@@ -44,7 +48,7 @@ test("the video studio floor plan has an area for every video department", () =>
   assert.ok(isDirector("showrunner"), "video leadership meets in the meeting room");
   // A game agent has no desk here, a video agent none in the game studio: they stay at Studio head.
   assert.deepEqual(areaTiersFor("gameplay-programmer", labels, {}), []);
-  const game = JSON.parse(readFileSync(new URL("../../public/assets/layouts/game-studio.json", import.meta.url), "utf8")).areas.map((a: { label: string }) => a.label);
+  const game = areasOf("game-campus.json");
   assert.deepEqual(areaTiersFor("video-editor", game, {}), []);
   assert.deepEqual(areaTiersFor("sound-designer", game, {}), [["Audio"]], "game audio keeps its room");
 });
@@ -71,10 +75,31 @@ test("venues: meeting room and editor desk", () => {
   assert.ok(!isEditorTool("Edit") && !isEditorTool(null));
 });
 
-test("the studio floor plan has the meeting room and the editor desk", () => {
-  const layout = JSON.parse(readFileSync(new URL("../../public/assets/layouts/game-studio.json", import.meta.url), "utf8"));
-  const labels = layout.areas.map((a: { label: string }) => a.label);
-  assert.equal(venueAreas("meeting", labels).length, 1);
-  assert.equal(venueAreas("editor", labels).length, 1);
-  assert.equal(venueAreas("lounge", labels).length, 1);
+test("both game themes have the meeting room, the editor desk, a Pantry and the directors' room", () => {
+  for (const file of GAME_THEMES) {
+    const labels = areasOf(file);
+    assert.equal(venueAreas("meeting", labels).length, 1, file);
+    assert.equal(venueAreas("editor", labels).length, 1, file);
+    assert.deepEqual(venueAreas("lounge", labels), ["Pantry"], file);
+    assert.deepEqual(directorAreas(labels), ["Ban giám đốc"], file);
+  }
+  assert.deepEqual(directorAreas(areasOf("video-studio.json")), ["Ban sản xuất"]);
+});
+
+test("ranks and who briefs a new sub-agent", () => {
+  assert.equal(tierOf("technical-director"), 1);
+  assert.equal(tierOf("lead-programmer"), 2);
+  assert.equal(tierOf("qa-lead"), 2);
+  assert.equal(tierOf("gameplay-programmer"), 3);
+  assert.equal(tierOf("general-purpose"), null);
+  const lp = { tier: 2, dept: "engineering" };
+  const td = { tier: 1, dept: "directors" };
+  const gp = { tier: 3, dept: "engineering" };
+  // A specialist: its own lead first, else a director; a lead: a director; nobody briefs a director.
+  assert.equal(briefer(gp, [td, lp]), 1);
+  assert.equal(briefer(gp, [td, { tier: 2, dept: "qa" }]), 0);
+  assert.equal(briefer(lp, [td, lp]), 0);
+  assert.equal(briefer(td, [{ tier: 1, dept: null }]), -1);
+  assert.equal(briefer({ tier: null, dept: null }, [td]), -1, "general-purpose is not briefed");
+  assert.equal(briefer(gp, []), -1);
 });

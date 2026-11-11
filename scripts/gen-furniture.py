@@ -6,8 +6,9 @@ Every pixel comes from this script (CC0, see docs/ASSETS.md); nothing is copied 
 Pieces give the Game studio rooms their own look:
 
     SERVER_RACK   Release & ops      EASEL         Art
-    SPEAKER       Audio              ARCADE        Lounge
-    WATER_COOLER  Studio head / Lounge
+    SPEAKER       Audio              ARCADE        Pantry
+    WATER_COOLER  Studio head / Pantry
+    FRIDGE        Pantry             VENDING_MACHINE  Pantry
     TEST_RIG      QA (a phone + a handheld on a stand)
 
     python scripts/gen-furniture.py     # writes the pieces
@@ -172,6 +173,41 @@ def test_rig():
     return c
 
 
+def fridge():
+    c = Canvas()
+    c.shadow(2, 13, 31)
+    body, edge = hexc("e8edf2"), hexc("c3ccd6")
+    c.rect(2, 3, 13, 30, body)
+    c.vline(12, 4, 29, edge)
+    # freezer door on top, fridge door below, handles
+    c.hline(3, 12, 11, hexc("9aa5b1"))
+    c.vline(4, 6, 9, hexc("6b7785"))
+    c.vline(4, 14, 19, hexc("6b7785"))
+    # a few magnets and a note
+    c.dot(8, 15, hexc("ef4444")), c.dot(10, 17, hexc("3b82f6"))
+    c.rect(7, 20, 10, 23, hexc("fde68a"), None)
+    c.hline(8, 9, 21, hexc("a16207"))
+    return c
+
+
+def vending_machine():
+    c = Canvas()
+    c.shadow(2, 13, 31)
+    c.rect(2, 2, 13, 30, hexc("b91c1c"))
+    c.vline(12, 3, 29, hexc("7f1d1d"))
+    # glass front with rows of cans and snacks
+    c.rect(3, 4, 9, 22, hexc("1e293b"))
+    for i, y in enumerate(range(6, 21, 4)):
+        for x in range(4, 9):
+            c.dot(x, y, (hexc("38bdf8"), hexc("facc15"), hexc("4ade80"), hexc("f472b6"))[(x + i) % 4])
+            c.dot(x, y + 1, hexc("475569"))
+    # keypad, coin slot, tray
+    c.rect(10, 6, 12, 12, hexc("e5e7eb"), None)
+    c.dot(11, 8, hexc("1f2937")), c.dot(11, 10, hexc("1f2937"))
+    c.rect(4, 24, 9, 27, hexc("111827"))
+    return c
+
+
 PIECES = [
     ("SERVER_RACK", "Server Rack", server_rack),
     ("EASEL", "Easel", easel),
@@ -179,6 +215,8 @@ PIECES = [
     ("ARCADE", "Arcade Cabinet", arcade),
     ("WATER_COOLER", "Water Cooler", water_cooler),
     ("TEST_RIG", "Test Devices", test_rig),
+    ("FRIDGE", "Fridge", fridge),
+    ("VENDING_MACHINE", "Vending Machine", vending_machine),
 ]
 
 

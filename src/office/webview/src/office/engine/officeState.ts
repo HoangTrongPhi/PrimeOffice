@@ -25,7 +25,16 @@ import {
   layoutToTileMap,
 } from '../layout/layoutSerializer.js';
 import { findPath, getWalkableTiles, isWalkable } from '../layout/tileMap.js';
-import { areaTiersFor, isDirector, isEditorTool, type Venue, venueAreas } from './departments.js';
+import {
+  areaTiersFor,
+  briefer,
+  departmentOf,
+  directorAreas,
+  isEditorTool,
+  tierOf,
+  type Venue,
+  venueAreas,
+} from './departments.js';
 import { getPetCount, getPetName } from '../sprites/petSpriteData.js';
 import { getLoadedCharacterCount } from '../sprites/spriteData.js';
 import type {
@@ -52,6 +61,9 @@ function seatFacingOffset(direction: Direction): { dCol: number; dRow: number } 
   return { dCol: 0, dRow: -1 };
 }
 
+/** PrimeOffice: how long a briefing in the meeting room lasts (seconds). */
+const BRIEFING_SEC = 8;
+
 export class OfficeState {
   layout: OfficeLayout;
   tileMap: TileTypeVal[][];
@@ -63,6 +75,8 @@ export class OfficeState {
   pets: Pet[] = [];
   /** Accumulated time for furniture animation frame cycling */
   furnitureAnimTimer = 0;
+  /** PrimeOffice: seconds since the office started (briefings end on it). */
+  private clock = 0;
   private _selectedAgentId: number | null = null;
   private readonly selectionListeners = new Set<(id: number | null) => void>();
   get selectedAgentId(): number | null {
@@ -512,17 +526,65 @@ export class OfficeState {
   }
 
   /**
-   * PrimeOffice: directors meet. Two or more director sub-agents at work at once (a director gate)
-   * → they take the meeting room's seats; fewer → back to their desks.
+   * PrimeOffice: a briefing. When a sub-agent starts, the one handing it the work — the lead of its
+   * department when one is at work for the same session, else a director (a director sub-agent, or
+   * the session itself when it is the Boss) — meets it in the meeting room for a few seconds; then
+   * each goes back to its own room. A full meeting room skips the briefing.
    */
-  private syncMeeting(): void {
-    const directors = [...this.characters.values()].filter(
-      (c) => c.isSubagent && c.matrixEffect !== 'despawn' && isDirector(c.agentType),
+  private brief(parentAgentId: number, child: Character): void {
+    const rank = (c: Character) =>
+      c.isSubagent ? tierOf(c.agentType) : c.isBoss ? 1 : null;
+    const seniors = [...this.characters.values()].filter(
+      (c) =>
+        c !== child &&
+        c.matrixEffect !== 'despawn' &&
+        (c.isSubagent ? c.parentAgentId === parentAgentId : c.id === parentAgentId),
     );
-    const meet = directors.length >= 2;
-    for (const c of directors) {
-      if (meet) this.startVisit(c, 'meeting');
-      else if (c.visit === 'meeting') this.endVisit(c);
+    const pick = briefer(
+      { tier: rank(child), dept: departmentOf(child.agentType)?.id ?? null },
+      seniors.map((c) => ({ tier: rank(c), dept: c.isSubagent ? (departmentOf(c.agentType)?.id ?? null) : null })),
+    );
+    if (pick < 0) return;
+    const senior = seniors[pick];
+    const until = this.clock + BRIEFING_SEC;
+    if (!this.startVisit(child, 'meeting')) return;
+    child.briefUntil = until;
+    if (this.startVisit(senior, 'meeting')) senior.briefUntil = Math.max(senior.briefUntil ?? 0, until);
+  }
+
+  /** PrimeOffice: briefings whose time is up: back to the desk. */
+  private endBriefings(): void {
+    for (const c of this.characters.values()) {
+      if (c.briefUntil === undefined || this.clock < c.briefUntil) continue;
+      c.briefUntil = undefined;
+      if (c.visit === 'meeting' && c.matrixEffect !== 'despawn') this.endVisit(c);
+    }
+  }
+
+  /**
+   * PrimeOffice: the Boss of a folder is its director: it works in the directors' room (Ban giám đốc)
+   * and stays there when its turn is done. No longer the Boss → back to an ordinary seat.
+   */
+  setAgentBoss(id: number, boss: boolean): void {
+    const ch = this.characters.get(id);
+    if (!ch || ch.isSubagent || !!ch.isBoss === boss) return;
+    ch.isBoss = boss;
+    const rooms = directorAreas((this.layout.areas ?? []).map((a) => a.label));
+    if (rooms.length === 0) return;
+    if (boss && ch.visit === 'lounge') this.endVisit(ch);
+    if (ch.visit) return; // a briefing or the editor: it comes back to its new seat afterwards
+    const inRoom = ch.seatId ? rooms.includes(this.seatZone(ch.seatId) ?? '') : false;
+    if (boss && !inRoom) {
+      const seat = this.freeSeatIn(rooms);
+      if (seat) this.reassignSeat(ch.id, seat);
+    } else if (!boss && inRoom) {
+      if (ch.seatId) {
+        const old = this.seats.get(ch.seatId);
+        if (old) old.assigned = false;
+        ch.seatId = null;
+      }
+      const seat = this.findFreeSeat(ch.directoryName);
+      if (seat) this.reassignSeat(ch.id, seat);
     }
   }
 
@@ -546,7 +608,8 @@ export class OfficeState {
    */
   setAgentResting(id: number, resting: boolean): void {
     const ch = this.characters.get(id);
-    if (!ch || ch.isSubagent) return;
+    // A director (the Boss) waits in its own room, not in the Pantry.
+    if (!ch || ch.isSubagent || ch.isBoss) return;
     if (resting) {
       if (!ch.visit) this.startVisit(ch, 'lounge');
     } else if (ch.visit === 'lounge') {
@@ -925,10 +988,10 @@ export class OfficeState {
       const spot = tiers.length > 0 ? this.freeTileIn(tiers[tiers.length - 1]) : null;
       if (spot) this.walkToTile(id, spot.col, spot.row);
     }
-    this.syncMeeting();
 
     this.subagentIdMap.set(key, id);
     this.subagentMeta.set(id, { parentAgentId, parentToolId });
+    this.brief(parentAgentId, ch);
     return id;
   }
 
@@ -959,8 +1022,7 @@ export class OfficeState {
     this.subagentMeta.delete(id);
     if (this.selectedAgentId === id) this.selectedAgentId = null;
     if (this.cameraFollowId === id) this.cameraFollowId = null;
-    // PrimeOffice: the meeting may end, the editor desk may be free.
-    this.syncMeeting();
+    // PrimeOffice: the editor desk may be free.
     if (ch?.visit === 'editor') this.editorNext();
   }
 
@@ -1317,6 +1379,10 @@ export class OfficeState {
     if (this.greeter && advanceMatrixEffect(this.greeter, dt) === 'despawned') {
       this.greeter = null;
     }
+
+    // PrimeOffice: briefings in the meeting room last a few seconds.
+    this.clock += dt;
+    this.endBriefings();
 
     const toDelete: number[] = [];
     for (const ch of this.characters.values()) {

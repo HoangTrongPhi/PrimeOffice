@@ -22,7 +22,14 @@ interface OfficeUiState {
   commandTab: CommandTab;
   /** Names the user gave office agents, by session id. */
   names: Record<string, string>;
+  /** Task names the user gave office agents (e.g. "task001"), by session id. */
+  tasks: Record<string, string>;
+  /** The Boss of each project folder: folder (lower case) → session id. */
+  bosses: Record<string, string>;
   addOpen: boolean;
+  setTask: (sessionId: string, task: string) => void;
+  /** Make a session the Boss of a folder (null: the folder has no Boss). */
+  setBoss: (cwd: string, sessionId: string | null) => void;
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setAgentTab: (tab: AgentTab) => void;
@@ -40,7 +47,24 @@ export const useOfficeUi = create<OfficeUiState>()(
       agentTab: "activity",
       commandTab: "monitor",
       names: {},
+      tasks: {},
+      bosses: {},
       addOpen: false,
+      setTask: (sessionId, task) =>
+        set((s) => {
+          const tasks = { ...s.tasks };
+          const t = task.trim().slice(0, 60);
+          if (t) tasks[sessionId] = t;
+          else delete tasks[sessionId];
+          return { tasks };
+        }),
+      setBoss: (cwd, sessionId) =>
+        set((s) => {
+          const bosses = { ...s.bosses };
+          if (sessionId) bosses[folderKey(cwd)] = sessionId;
+          else delete bosses[folderKey(cwd)];
+          return { bosses };
+        }),
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setSidebarWidth: (w) => set({ sidebarWidth: Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w))) }),
       setAgentTab: (agentTab) => set({ agentTab }),
@@ -55,7 +79,7 @@ export const useOfficeUi = create<OfficeUiState>()(
         }),
       setAddOpen: (addOpen) => set({ addOpen }),
     }),
-    { name: "primeoffice.office-ui", partialize: (s) => ({ sidebarOpen: s.sidebarOpen, sidebarWidth: s.sidebarWidth, agentTab: s.agentTab, commandTab: s.commandTab, names: s.names }) },
+    { name: "primeoffice.office-ui", partialize: (s) => ({ sidebarOpen: s.sidebarOpen, sidebarWidth: s.sidebarWidth, agentTab: s.agentTab, commandTab: s.commandTab, names: s.names, tasks: s.tasks, bosses: s.bosses }) },
   ),
 );
 
@@ -82,6 +106,22 @@ const folderOf = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
 /** An office agent's name on screen: the one the user gave it, its terminal's, its title, its folder. */
 export function agentName(session: AgentSession, names: Record<string, string>, term?: TermTab): string {
   return names[session.sessionId] || term?.name || session.title || folderOf(session.cwd) || "Agent";
+}
+
+/** A folder as a key: no trailing separator, one kind of slash, lower case (Windows paths). */
+export function folderKey(cwd: string): string {
+  return cwd.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+/** The task an office agent is on: the one the user gave it, else its session's title (unless that
+ *  is already its name), else "" (the office then shows the folder). */
+export function agentTask(session: AgentSession, tasks: Record<string, string>, name: string): string {
+  return tasks[session.sessionId] || (session.title && session.title !== name ? session.title : "");
+}
+
+/** True when this session is the Boss of its folder. */
+export function isBoss(session: AgentSession, bosses: Record<string, string>): boolean {
+  return !!session.sessionId && bosses[folderKey(session.cwd)] === session.sessionId;
 }
 
 export { termName };

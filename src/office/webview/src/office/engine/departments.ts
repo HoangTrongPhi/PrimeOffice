@@ -187,9 +187,10 @@ export function areaTiersFor(
 
 /**
  * Shared rooms an agent visits for a while, then leaves for its own desk again:
- *   meeting — directors meet there when two or more of them work at the same time (director gates);
+ *   meeting — a briefing: a director (or a department lead) and the sub-agent it hands work to meet
+ *             there for a few seconds when the sub-agent starts;
  *   editor  — the engine editor desk: an engine MCP call (Unreal MCP takes one call at a time);
- *   lounge  — a main session whose turn is done rests there until it works again.
+ *   lounge  — the Pantry (or Lounge): a main session whose turn is done rests there until it works again.
  */
 export type Venue = 'meeting' | 'editor' | 'lounge';
 
@@ -205,13 +206,61 @@ export function venueAreas(venue: Venue, areaLabels: string[]): string[] {
   return areaLabels.filter((l) => wanted.has(normalizeLabel(l)));
 }
 
-/** Departments whose members gather in the meeting room (a studio's leadership). */
+/** Departments of a studio's leadership (tier 1). */
 const LEADERSHIP = ['directors', 'producers'];
 
-/** Directors (tier 1): they gather in the meeting room. */
+/**
+ * Department leads (tier 2) of Claude Code Game Studios: they hand work to the specialists of their
+ * department. Any other `lead-*` / `*-lead` type counts too.
+ */
+const LEADS = [
+  'game-designer',
+  'lead-programmer',
+  'art-director',
+  'audio-director',
+  'narrative-director',
+  'qa-lead',
+  'release-manager',
+  'localization-lead',
+];
+
+/** Directors (tier 1): they work only in the directors' room and leave it to brief someone. */
 export function isDirector(agentType: string | undefined): boolean {
   const id = departmentOf(agentType)?.id;
   return id !== undefined && LEADERSHIP.includes(id);
+}
+
+/**
+ * Rank of a sub-agent: 1 director, 2 department lead, 3 specialist; null for agents without a
+ * department (`general-purpose`, `Explore` …), which brief nobody and are briefed by nobody.
+ */
+export function tierOf(agentType: string | undefined): 1 | 2 | 3 | null {
+  const dept = departmentOf(agentType);
+  if (!dept) return null;
+  if (LEADERSHIP.includes(dept.id)) return 1;
+  const t = agentType!.toLowerCase();
+  if (LEADS.includes(t) || /^lead-|-lead$/.test(t)) return 2;
+  return 3;
+}
+
+/**
+ * Who briefs a new sub-agent: the lead of its own department when one is at work, else a director.
+ * `seniors` are the agents working for the same session, each with its tier (a Boss main session
+ * counts as a director) and department. Returns the index of the one that briefs, or -1.
+ */
+export function briefer(child: { tier: number | null; dept: string | null }, seniors: { tier: number | null; dept: string | null }[]): number {
+  if (child.tier === null) return -1;
+  const lead = seniors.findIndex((s) => s.tier === 2 && child.tier === 3 && s.dept !== null && s.dept === child.dept);
+  if (lead >= 0) return lead;
+  return seniors.findIndex((s) => s.tier === 1 && child.tier! > 1);
+}
+
+/** Area labels of the directors' room (Ban giám đốc, Directors, Ban sản xuất …) in this layout. */
+export function directorAreas(areaLabels: string[]): string[] {
+  const wanted = new Set(
+    DEPARTMENTS.filter((d) => LEADERSHIP.includes(d.id)).flatMap((d) => d.aliases.map(normalizeLabel)),
+  );
+  return areaLabels.filter((l) => wanted.has(normalizeLabel(l)));
 }
 
 /**

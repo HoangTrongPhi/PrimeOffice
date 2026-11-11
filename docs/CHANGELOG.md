@@ -2,7 +2,36 @@
 
 All user-visible changes. Newest first; one section per released version.
 
-## Unreleased
+## 0.5.0 — 2026-11-11
+
+- **One project per studio**: a new studio follows exactly one Claude Code project — a folder with its own
+  `.claude` — and a folder can be the project of one studio only. New studio lists the opened folders and says why
+  one cannot be picked (no `.claude`, already another studio's project). Studio… shows the studio's project; a
+  studio made before keeps showing every project until you choose its project.
+- **Theme Studio** (replaces Floor plan…): load a theme of any kind — **Game studio** now has two: **Campus** (a
+  room per department with walls and doors, Pantry under Studio head) and **Open Floor** (an executive wing with
+  walls beside one open floor where departments are areas); Video studio and Classic office as before. New studio
+  lets you pick the theme too.
+- **Rooms from templates**: Theme Studio → Add a room: 12 ready rooms (small / medium / large department, Ban giám
+  đốc, Phòng họp, Pantry, Studio head, Lab / Server, Art, Audio, QA, empty) with a preview; name it and it is built
+  into the floor — walls, a doorway, furniture, and an area with that name (name a room after a department and its
+  sub-agents sit there). The floor grows when it is full (up to 64 × 64). Arrange desks, chairs and PCs tile by tile
+  with the office's Layout button, then **Keep a room as a template** to reuse it in any studio.
+- **Pantry** replaces the Lounge in the Game studio: agents with nothing to do rest there (new furniture: fridge,
+  vending machine).
+- **Directors stay in Ban giám đốc**: the Boss of a folder works in the directors' room and waits there between
+  turns. When work is handed down, the one handing it and the sub-agent meet in Phòng họp for a few seconds, then
+  each goes back to its own room: a department lead briefs the specialists of its department, else a director (a
+  director sub-agent or the Boss) does. Two directors at work no longer gather in the meeting room by themselves.
+
+- **Office labels name the agent**: the label over a character shows the agent's own name (the one on its card),
+  then what it is doing, then its **task** instead of the project folder. The task name is set in Add agent →
+  Briefing or in the agent's details (Task field); empty = the session's title.
+- **Boss and team briefing** (Add agent → Briefing → Role): the first agent added in a folder is its **Boss**
+  (crown on its card, `BOSS · name` in the office) and keeps the team's directives in `.primeoffice/briefing.md`;
+  agents added after it are **Members** that read that file before they work and report in
+  `.primeoffice/reports/`. **Solo** types only your first task. The whole first message is shown before it starts;
+  the Boss button in the agent's details gives or takes the role.
 
 ## 0.4.0 — 2026-11-11
 

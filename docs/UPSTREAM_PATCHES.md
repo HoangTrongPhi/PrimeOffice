@@ -17,3 +17,10 @@ diff small; re-apply after every update.
 | `webview/src/hooks/useExtensionMessages.ts` | `subagentToolStart` uses `msg.toolName` when sent (upstream derives it from the label) | The real MCP tool name reaches `setAgentTool` |
 | `webview/src/office/engine/officeState.ts` | `setAgentResting(id, resting)`: a main session whose turn is done visits the lounge; `setAgentActive(true)` brings it back | Who is free shows at a glance |
 | `webview/src/hooks/useExtensionMessages.ts` | `agentStatus` calls `os.setAgentResting(id, waiting && !awaitingInput)` | Same |
+| `webview/src/office/types.ts` | `Character.taskName?`, `Character.isBoss?` | 2026-11-11: the label shows the agent's own name and its task, not only the folder |
+| `webview/src/hooks/useExtensionMessages.ts` | New message `agentLabels` (`labels: { [id]: { name, task, boss } }`, posted by `OfficeTab` on every agent refresh) sets `agentName` / `taskName` / `isBoss` on main agents | Same; names, tasks and the Boss live in the shell (`officeUiStore`), by session id |
+| `webview/src/office/engine/departments.ts` | 2026-11-11: `tierOf` (director / lead / specialist), `briefer` (who briefs a new sub-agent), `directorAreas`; venue `lounge` matches Pantry | Theme Studio rules: directors stay in their room, work handed down is briefed in the meeting room |
+| `webview/src/office/engine/officeState.ts` | 2026-11-11: `syncMeeting` (2+ directors meet) replaced by `brief()` on `addSubagent` (child and its briefer visit the meeting room for `BRIEFING_SEC` = 8 s, ended by `endBriefings()` in `update` on an office clock); `setAgentBoss(id, boss)`: the Boss takes a seat in the directors' room and does not rest in the Pantry (`setAgentResting` skips it) | Same |
+| `webview/src/office/types.ts` | 2026-11-11: `Character.briefUntil?` | Same |
+| `webview/src/hooks/useExtensionMessages.ts` | 2026-11-11: `agentLabels` calls `os.setAgentBoss` instead of setting `isBoss` | Same |
+| `webview/src/office/components/ToolOverlay.tsx` | Name line: `BOSS · <name>` in the lead colour when `isBoss`; third line: `taskName`, else `directoryName` | Same |

@@ -223,6 +223,8 @@ export interface Character {
   visit?: 'meeting' | 'editor' | 'lounge';
   /** PrimeOffice: the seat it left for the visit (freed meanwhile; taken back if still free) */
   homeSeatId?: string | null;
+  /** PrimeOffice: office clock (seconds) when its briefing in the meeting room ends */
+  briefUntil?: number;
   /** Active matrix spawn/despawn effect, or null */
   matrixEffect: 'spawn' | 'despawn' | null;
   /** Timer counting up from 0 to MATRIX_EFFECT_DURATION */
@@ -247,6 +249,10 @@ export interface Character {
   teamName?: string;
   /** Role name within the team (null for lead) */
   agentName?: string;
+  /** PrimeOffice: the task this agent is on (shown instead of the folder). */
+  taskName?: string;
+  /** PrimeOffice: the Boss of its project folder. */
+  isBoss?: boolean;
   /** Whether this agent is the team lead */
   isTeamLead?: boolean;
   /** ID of the lead agent (set on teammates) */

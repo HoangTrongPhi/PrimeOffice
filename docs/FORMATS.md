@@ -35,16 +35,32 @@ PrimeOffice writes nothing itself: the CLI saves the session in `~/.claude/proje
 ## Written by the app (`%LOCALAPPDATA%\com.phineas.primeoffice\`)
 
 - `projects.json` — opened project folders, newest first: `["D:\\Game", "P:\\Tools"]`
-- `studios.json` — the studios of the Office tab and the one on screen:
+- `studios.json` — the studios of the Office tab and the one on screen (since 0.4 a studio follows one project:
+  `projects` holds at most one folder, which had its own `.claude` when it was given, and no folder is in two
+  studios; older files are tidied on load — first folder kept, a folder already taken by an earlier studio dropped):
   `{ "active": "video-1", "studios": [{ "id": "main", "name": "Game studio", "kind": "game", "projects": [] },
   { "id": "video-1", "name": "YouTube", "kind": "video", "projects": ["D:\\Vlog"] }] }`. `id`: `a-z0-9-`, unique;
   `kind`: `game` | `video` | `classic` (an unknown kind shows the classic office); `projects`: folders whose agents
   appear in the studio, empty = every project. Missing → one Game studio `main`. At most 12 studios.
 - `layout-<id>.json` — the layout of studio `<id>`, same structure as `layout.json` (the layout of studio `main`).
-  Missing → the floor plan of the studio's kind (`public/assets/layouts/<kind>-studio.json`). Deleted with its studio.
+  Missing → the first theme of the studio's kind (`src/lib/studios.ts`: `layouts/game-campus.json`,
+  `layouts/video-studio.json`, `default-layout-1.json`). Deleted with its studio.
 - `layout.json` — the office layout saved by the editor (pixel-agents `OfficeLayout`: `{ version: 1, cols, rows,
   tiles[], furniture[], tileColors? }`). Missing → the bundled `public/assets/default-layout-1.json`.
+- `office.json` — what the office UI changes itself (`OfficePrefs`): `soundEnabled`, `alwaysShowLabels`,
+  `showAreas`, `areaMappings` (folder → area labels), `seats` (transcript path → seat), and since 0.4
+  `roomTemplates`: rooms kept in Theme Studio, at most 50, each a `RoomTemplate` of `src/lib/rooms.ts`
+  `{ id, label, zone, w, h, floor, floorColor, areaColor, seats, furniture: [{ type, col, row }] }` (furniture
+  relative to the room's top-left floor tile; wall decor has negative rows). Written by the `saveRoomTemplates`
+  office message, read back in `office_snapshot.roomTemplates`.
 - `settings.json` — app settings (template; nothing app-specific yet).
+
+## Bundled with the app (`public/assets/`)
+
+- `layouts/game-campus.json`, `layouts/game-open.json`, `layouts/video-studio.json` — studio themes (pixel-agents
+  `OfficeLayout` with `areas` / `areaTiles`), drawn by `scripts/gen-studio-layout.py`.
+- `rooms/room-templates.json` — `{ version: 1, rooms: RoomTemplate[] }`, the rooms of Theme Studio → Add a room,
+  drawn by the same script.
 
 ## Reports (`--report`)
 

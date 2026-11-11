@@ -1,10 +1,20 @@
 # PrimeOffice — Progress
 
 ## Status
+<<<<<<< Updated upstream
 - Current phase: 0.4.0 (Office control room, Terminal tab, Chat whole conversation) — version set and pushed
   2026-11-11 (`b355f16`); the user publishes it with the GitHub Actions workflow **Release** (needs the
   `TAURI_SIGNING_PRIVATE_KEY` secret; the key is not on this PC and `gh` is not installed). 0.3.0 was released
   2026-11-11. The user commits, pushes and publishes GitHub releases themself
+=======
+- 2026-11-11 (evening): **0.5.0 built** on the user's request (Theme Studio, room templates, one project per
+  studio, Pantry, briefings, Boss and team briefing) — signed files in `release/0.5.0` (installer 4.15 MB,
+  SHA256SUMS checked). Not committed, not pushed, not published. origin/main is 1 commit ahead (a PROGRESS.md edit
+  by the user): pull before committing; PROGRESS.md may need a merge.
+- Current phase: 0.3.0 built 2026-11-11 on the user's request (Chat, Studios + Video studio, Codex sessions); files
+  in `release/0.3.0`; not published. 0.2.0 was released 2026-11-10. The user commits, pushes and publishes GitHub
+  releases themself
+>>>>>>> Stashed changes
 - Last session: 2026-11-09 — app built from the template: Rust observer + providers + project check + CLI,
   vendored pixel-agents office in an iframe, Projects / History / Agents modules, generated character crew
 - `npm run check`: green 2026-11-11 (66 Rust tests, 11 TS tests, typecheck, 30/30 commands mocked); `npm run build` green
@@ -105,6 +115,54 @@
   departments in `departments.ts`. Seen in `?mock`: create a Video studio, its floor loads, switch back, Studio…
   dialog; no console errors. Not yet in the real window. Open: per-studio skill sets (the user picks them later;
   the video agent types are placeholders), area mappings and seats are still shared by all studios.
+- [x] **Theme Studio + room templates + one project per studio + briefings** — built (2026-11-11,
+  asked by the user after approving the demo artifact "PrimeOffice Theme Studio",
+  https://claude.ai/artifact/Uq4suHPhemnrXtap4Wouh6). What the user asked: (1) a new studio follows exactly one
+  project = one folder with its own `.claude`; (2) "Floor plan…" becomes **Theme Studio**: Game studio has 2
+  themes, Video studio and Classic office unchanged; (3) departments laid out sensibly + ready-made **room
+  templates** the user adds and names, plus arranging furniture tile by tile (= the office's own Layout editor);
+  (4) directors (agents tagged director) work only in Ban giám đốc; when a director hands work to a lower agent
+  both meet in Phòng họp; other ranks the same; (5) **Pantry** replaces Lounge and is where idle agents go;
+  (6) furniture assets: the user adds more later by path, or Claude generates them.
+  **Done so far (not yet run in `?mock` or the real window):**
+  - `scripts/gen-furniture.py`: + FRIDGE, VENDING_MACHINE (CC0); `npm run assets` rerun (46 furniture).
+  - `scripts/gen-studio-layout.py` rewritten: room templates as furnish functions (`t_dept`, `t_directors`,
+    `t_meeting`, `t_pantry`, `t_head`, `t_lab`, `t_art`, `t_audio`, `t_qa`, `t_empty`), `Plan.fits/try_put`
+    with catalog footprints; plans `layouts/game-campus.json` (46×41, walls) and `layouts/game-open.json`
+    (46×37, executive wing + open floor), both with Pantry; `video-studio.json` unchanged byte for byte;
+    `rooms/room-templates.json` (12 templates). `layouts/game-studio.json` DELETED (tests still mention it →
+    fix `scripts/tests/departments.test.ts` to use game-campus/game-open).
+  - `src/lib/rooms.ts` (stampRoom / findSpot / templateFromArea, grows the floor up to 64×64) +
+    `scripts/tests/rooms.test.ts` (3 tests pass) — add it to `test:ts` in package.json.
+  - `src/lib/studios.ts`: `StudioKind.themes[]`, `planFileOf`, `projectBlocker`.
+  - `src/components/office/ThemeStudio.tsx` (themes with map thumbnails, Add a room with sprite previews,
+    Keep a room as a template, delete own templates); `OfficeTab.tsx`: Theme Studio… button, New studio needs a
+    project with `.claude` (+ kind and theme), Studio… dialog has one Project select.
+  - Rust: `studio_cmd.rs` `check_new_projects` (one folder, `.claude` present, not in another studio) and
+    `normalized` tidies old files (first folder kept, no folder in two studios); `office_cmd.rs`
+    `OfficePrefs.room_templates` + `saveRoomTemplates` message + `OfficeSnapshot.roomTemplates`. `cargo test`
+    67 passed. Mock backend: same rules, `NewPrototype` has no `.claude`.
+  - Engine: `departments.ts` `tierOf` / `briefer` / `directorAreas`; `officeState.ts` replaces the old
+    "≥2 directors meet" rule with `brief()` (8 s in the meeting room when a sub-agent starts: its department lead,
+    else a director sub-agent, else the Boss parent), `endBriefings()` in `update`, `setAgentBoss()` (the Boss =
+    the folder's director: sits in Ban giám đốc, does not rest in the Pantry); `useExtensionMessages` calls
+    `setAgentBoss`; `types.ts` `briefUntil`. `npx tsc -b` clean.
+  - Later the same session: departments.test.ts moved to game-campus/game-open + tests for tierOf/briefer/
+    directorAreas; rooms.test.ts in `test:ts`; `npm run check` green (typecheck, 30/30 mocked, 18 TS tests,
+    67 Rust). `?mock`: Theme Studio opens (themes with map thumbnails, room previews with real sprites), "Add
+    room" Gameplay grew the floor to 46×51 with the new Area, no console errors. Fixed: dialogs taller than the
+    window did not scroll (`max-h-[calc(100vh-3rem)]` on the Modal).
+  - Finished the same day: `?mock` checks — New studio blocks NewPrototype ("no .claude folder") and, once
+    StarHarbor has a studio, StarHarbor ("already the project of StarHarbor"); a studio made with the Open Floor
+    theme gets `game-open.json` (46×37) and `projects: [StarHarbor]`; Keep a room saved "Ban giám đốc" as a
+    template (12×8, 3 seats) shown as "yours". Docs: CHANGELOG (Unreleased), FORMATS (studios.json one project,
+    office.json `roomTemplates`, bundled layouts and rooms), UPSTREAM_PATCHES, ASSETS (new furniture, themes,
+    templates, how to add furniture), in-app help (VI/EN). `npm run check` green again.
+  **Not done / open:** not tried in the real window (a briefing needs a real session spawning sub-agents; the mock
+  has none). The mock leaves stale event listeners when the office frame reloads (`plugin:event|unlisten` returns
+  0 without removing): "Couldn't find callback id" warnings after switching studios — mock only, older than this
+  work. Video studio keeps its Lounge (user: unchanged). Assets are added at build time
+  (`public/assets/furniture/<ID>/` + `npm run assets`); runtime asset folders are not supported.
 - [ ] P7 Optional Claude hooks via `primeoffice.exe hook` (exact permission bubbles)
 
 ## Decisions (answers to the spec's open questions)

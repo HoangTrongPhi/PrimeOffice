@@ -5,12 +5,23 @@
 | Set | Path | Origin | License | Status |
 |---|---|---|---|---|
 | **PrimeOffice crew** (8 characters) | `public/assets/characters/pixel/` | Drawn by `scripts/gen-characters.py` (procedural, no third-party pixels) | Ours — CC0 | Default crew |
-| **Studio furniture** (6: SERVER_RACK, EASEL, SPEAKER, ARCADE, WATER_COOLER, TEST_RIG) | `public/assets/furniture/<ID>/` | Drawn by `scripts/gen-furniture.py` (procedural, no third-party pixels) | Ours — CC0 | Game studio floor plan |
-| **Game studio floor plan** | `public/assets/layouts/game-studio.json` | Built by `scripts/gen-studio-layout.py` from the pieces above and the bundled furniture | Layout data — ours | Office → Floor plan… |
+| **Studio furniture** (8: SERVER_RACK, EASEL, SPEAKER, ARCADE, WATER_COOLER, TEST_RIG, FRIDGE, VENDING_MACHINE) | `public/assets/furniture/<ID>/` | Drawn by `scripts/gen-furniture.py` (procedural, no third-party pixels) | Ours — CC0 | Studio themes, room templates |
+| **Studio themes** (Game studio Campus / Open Floor, Video studio) | `public/assets/layouts/game-campus.json`, `game-open.json`, `video-studio.json` | Built by `scripts/gen-studio-layout.py` from the pieces above and the bundled furniture | Layout data — ours | Office → Theme Studio… |
+| **Room templates** (12) | `public/assets/rooms/room-templates.json` | Same script, same furnishing as the themes | Layout data — ours | Theme Studio → Add a room |
 | Classic characters (6) | `public/assets/characters/char_*.png` | pixel-agents, based on [JIK-A-4 — MetroCity free top-down character pack](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack) | Author: free, "use it as you wish", commercial use allowed, credit appreciated not required (pack page comments + devlog, checked 2026-11-09; no formal license field) | Selectable ("Crew → Classic"); credited here |
 | Floors, walls, carpets, furniture (38 items) | `public/assets/{floors,walls,carpets,furniture}/` | pixel-agents commit `add749a` ("replace all previously privately-licensed assets with fully open-source ones") | MIT repo, no separate art license — ask upstream to confirm for commercial use | Used as is |
 | FS Pixel Sans Unicode font | `public/fonts/` | pixel-agents (font by NZWStudios, FontStruct) | Listed as SIL OFL, free for commercial use ([1001fonts](https://www.1001fonts.com/fs-pixel-sans-unicode-regular-font.html), [CufonFonts](https://www.cufonfonts.com/font/fs-pixel-sans-unicode)); the FontStruct page has no download to confirm | Used by the office UI; swap for a confirmed OFL pixel font if in doubt |
 | Pets (claudio, gitcat) | — | pixel-agents | Unclear; "claudio" is Claude-themed | **Not copied** |
+
+## Adding furniture
+
+Furniture is read at build time from `public/assets/furniture/<ID>/`: one folder per piece with its PNG(s) and a
+`manifest.json` in pixel-agents' format (`id`, `name`, `category` — desks / chairs / electronics / decor / wall /
+misc, `footprintW` / `footprintH` in tiles, `backgroundTiles`, `canPlaceOnWalls`, `canPlaceOnSurfaces`, `width` /
+`height` in pixels; see `SERVER_RACK/manifest.json`). Copy the folder in, run `npm run assets`, and the piece is in the
+office's Layout editor. To use it in themes or room templates, place it in `scripts/gen-studio-layout.py` and rerun
+it. New pieces can also be drawn by `scripts/gen-furniture.py` (procedural, CC0). PrimeOffice does not read asset
+folders while it runs (pixel-agents' "asset folders" setting is hidden).
 
 ## Format (so new art just drops in)
 

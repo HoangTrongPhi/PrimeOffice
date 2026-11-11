@@ -71,7 +71,8 @@ interface StudioState extends Studios {
   /** Save a new list; false when the backend refused it (the list on screen is kept). */
   save: (next: Studios) => Promise<boolean>;
   setActive: (id: string) => Promise<boolean>;
-  add: (kind: string, name: string) => Promise<boolean>;
+  /** A new studio of `kind` following the project folder `project`; its id, or null when refused. */
+  add: (kind: string, name: string, project: string) => Promise<string | null>;
   update: (id: string, patch: Partial<Pick<Studio, "name" | "projects">>) => Promise<boolean>;
   remove: (id: string) => Promise<boolean>;
 }
@@ -116,10 +117,11 @@ export const useStudioStore = create<StudioState>()((set, get) => ({
     useOfficeStore.getState().select(null);
     return get().save({ active: id, studios });
   },
-  add: (kind, name) => {
+  add: async (kind, name, project) => {
     const { studios } = get();
     const id = newStudioId(kind, studios);
-    return get().save({ active: id, studios: [...studios, { id, name: name.trim() || kindOf(kind).label, kind, projects: [] }] });
+    const ok = await get().save({ active: id, studios: [...studios, { id, name: name.trim() || kindOf(kind).label, kind, projects: [project] }] });
+    return ok ? id : null;
   },
   update: (id, patch) => {
     const { active, studios } = get();

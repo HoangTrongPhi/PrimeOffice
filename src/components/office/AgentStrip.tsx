@@ -1,6 +1,6 @@
-import { Plus, SquareTerminal, X } from "lucide-react";
+import { Crown, Plus, SquareTerminal, X } from "lucide-react";
 import type { OfficeAgent, SessionStatus } from "../../types/primeoffice";
-import { agentName, selectAgent, selectTerm, termOf, useOfficeUi } from "../../stores/officeUiStore";
+import { agentName, isBoss, selectAgent, selectTerm, termOf, useOfficeUi } from "../../stores/officeUiStore";
 import { useOfficeStore } from "../../stores/dataStore";
 import { termName, useTermStore, type TermTab } from "../../stores/termStore";
 import { folderName } from "../session/SessionView";
@@ -34,7 +34,7 @@ export function AgentStrip() {
   const agents = useOfficeStore((s) => s.agents);
   const selectedId = useOfficeStore((s) => s.selectedId);
   const tabs = useTermStore((s) => s.tabs);
-  const { term, names, setAddOpen } = useOfficeUi();
+  const { term, names, tasks, bosses, setAddOpen } = useOfficeUi();
   const loose = looseTerms(agents, tabs);
 
   return (
@@ -53,11 +53,12 @@ export function AgentStrip() {
             <div className="flex items-center gap-1.5">
               <span className={`size-2 shrink-0 rounded-full ${DOT[session.status]}`} />
               <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">{agentName(session, names, linked)}</span>
+              {isBoss(session, bosses) && <Crown className="size-3 shrink-0 text-amber" aria-label="Boss of this folder" />}
               {linked && linked.state !== "ended" && <SquareTerminal className="size-3 shrink-0 text-accent" aria-label="Has a terminal here" />}
             </div>
             <div className="truncate text-[11px] text-ink-muted">{session.openTools[0]?.label ?? session.actions.at(-1)?.label ?? STATE_LABEL[session.status]}</div>
             <div className="flex gap-1.5 text-[10.5px] text-ink-faint">
-              <span className="truncate">{folderName(session.cwd)}</span>
+              <span className="truncate">{tasks[session.sessionId] || folderName(session.cwd)}</span>
               <span>·</span>
               <span className="shrink-0">{PROVIDER[session.provider] ?? session.provider}</span>
             </div>

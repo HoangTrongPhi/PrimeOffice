@@ -274,8 +274,15 @@ export function ToolOverlay({
         }
 
         // Team info
-        const teamRoleLabel = ch.isTeamLead ? 'LEAD' : ch.agentName || null;
-        const hasExtraLines = !!(ch.directoryName || teamRoleLabel);
+        // PrimeOffice patch: the agent's own name first ("BOSS · name" for the folder's Boss),
+        // and its task instead of the folder when it has one.
+        const teamRoleLabel = ch.isTeamLead
+          ? 'LEAD'
+          : ch.isBoss
+            ? `BOSS · ${ch.agentName ?? ''}`
+            : ch.agentName || null;
+        const detailLabel = isSub ? ch.directoryName : ch.taskName || ch.directoryName;
+        const hasExtraLines = !!(detailLabel || teamRoleLabel);
 
         // Context gauge. Every agent gets one — lead, teammate, adopted,
         // headless — as soon as it has taken a turn. Sub-agents never do: they
@@ -311,8 +318,8 @@ export function ToolOverlay({
                       className="overflow-hidden text-ellipsis block leading-none"
                       style={{
                         fontSize: '18px',
-                        color: ch.isTeamLead ? TEAM_LEAD_COLOR : TEAM_ROLE_COLOR,
-                        fontWeight: ch.isTeamLead ? 'bold' : undefined,
+                        color: ch.isTeamLead || ch.isBoss ? TEAM_LEAD_COLOR : TEAM_ROLE_COLOR,
+                        fontWeight: ch.isTeamLead || ch.isBoss ? 'bold' : undefined,
                       }}
                     >
                       {teamRoleLabel}
@@ -327,9 +334,9 @@ export function ToolOverlay({
                   >
                     {activityText}
                   </span>
-                  {ch.directoryName && (
+                  {detailLabel && (
                     <span className="text-2xs leading-none overflow-hidden text-ellipsis block">
-                      {ch.directoryName}
+                      {detailLabel}
                     </span>
                   )}
                 </div>

@@ -1,0 +1,1376 @@
+{
+ "version": 1,
+ "rooms": [
+  {
+   "id": "dept-s",
+   "label": "Phòng ban nhỏ",
+   "zone": "dept",
+   "w": 9,
+   "h": 7,
+   "floor": 1,
+   "floorColor": {
+    "h": 170,
+    "s": 35,
+    "b": -30,
+    "c": -80
+   },
+   "areaColor": "#5dcaa5",
+   "seats": 4,
+   "furniture": [
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 6
+    },
+    {
+     "type": "PLANT",
+     "col": 0,
+     "row": 2
+    },
+    {
+     "type": "BIN",
+     "col": 0,
+     "row": 1
+    },
+    {
+     "type": "SMALL_PAINTING",
+     "col": 0,
+     "row": -2
+    },
+    {
+     "type": "CLOCK",
+     "col": 1,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "dept-m",
+   "label": "Phòng ban vừa",
+   "zone": "dept",
+   "w": 13,
+   "h": 9,
+   "floor": 7,
+   "floorColor": {
+    "h": 25,
+    "s": 48,
+    "b": -43,
+    "c": -88
+   },
+   "areaColor": "#5dcaa5",
+   "seats": 6,
+   "furniture": [
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 10,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 10,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 6
+    },
+    {
+     "type": "PLANT",
+     "col": 0,
+     "row": 4
+    },
+    {
+     "type": "BIN",
+     "col": 0,
+     "row": 3
+    },
+    {
+     "type": "SMALL_PAINTING",
+     "col": 0,
+     "row": -2
+    },
+    {
+     "type": "CLOCK",
+     "col": 1,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "dept-l",
+   "label": "Phòng ban lớn",
+   "zone": "dept",
+   "w": 16,
+   "h": 11,
+   "floor": 7,
+   "floorColor": {
+    "h": 10,
+    "s": 45,
+    "b": -40,
+    "c": -85
+   },
+   "areaColor": "#d85a30",
+   "seats": 12,
+   "furniture": [
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 10,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 13,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 14,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 14,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 10,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 13,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 14,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 14,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 7
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 7
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 9
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 7
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 7
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 9
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 7
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 10,
+     "row": 7
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 9
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 13,
+     "row": 7
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 14,
+     "row": 7
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 14,
+     "row": 9
+    },
+    {
+     "type": "PLANT",
+     "col": 0,
+     "row": 6
+    },
+    {
+     "type": "BIN",
+     "col": 0,
+     "row": 5
+    },
+    {
+     "type": "SMALL_PAINTING",
+     "col": 0,
+     "row": -2
+    },
+    {
+     "type": "CLOCK",
+     "col": 1,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "directors",
+   "label": "Ban giám đốc",
+   "zone": "directors",
+   "w": 13,
+   "h": 8,
+   "floor": 1,
+   "floorColor": {
+    "h": 270,
+    "s": 30,
+    "b": -30,
+    "c": -80
+   },
+   "areaColor": "#7f77dd",
+   "seats": 3,
+   "furniture": [
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 10,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 3
+    },
+    {
+     "type": "LARGE_PLANT",
+     "col": 11,
+     "row": 5
+    },
+    {
+     "type": "PLANT",
+     "col": 10,
+     "row": 6
+    },
+    {
+     "type": "POT",
+     "col": 9,
+     "row": 7
+    },
+    {
+     "type": "DOUBLE_BOOKSHELF",
+     "col": 0,
+     "row": -2
+    },
+    {
+     "type": "LARGE_PAINTING",
+     "col": 2,
+     "row": -2
+    },
+    {
+     "type": "DOUBLE_BOOKSHELF",
+     "col": 4,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "meeting",
+   "label": "Phòng họp",
+   "zone": "meeting",
+   "w": 12,
+   "h": 8,
+   "floor": 9,
+   "floorColor": {
+    "h": 220,
+    "s": 10,
+    "b": -30,
+    "c": -20
+   },
+   "areaColor": "#afa9ec",
+   "seats": 8,
+   "furniture": [
+    {
+     "type": "TABLE_FRONT",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "PC_SIDE",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "PC_SIDE",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "PC_SIDE:left",
+     "col": 4,
+     "row": 1
+    },
+    {
+     "type": "PC_SIDE:left",
+     "col": 4,
+     "row": 3
+    },
+    {
+     "type": "WOODEN_CHAIR_SIDE",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "WOODEN_CHAIR_SIDE",
+     "col": 1,
+     "row": 3
+    },
+    {
+     "type": "WOODEN_CHAIR_SIDE:left",
+     "col": 5,
+     "row": 1
+    },
+    {
+     "type": "WOODEN_CHAIR_SIDE:left",
+     "col": 5,
+     "row": 3
+    },
+    {
+     "type": "TABLE_FRONT",
+     "col": 7,
+     "row": 1
+    },
+    {
+     "type": "PC_SIDE",
+     "col": 7,
+     "row": 1
+    },
+    {
+     "type": "PC_SIDE",
+     "col": 7,
+     "row": 3
+    },
+    {
+     "type": "PC_SIDE:left",
+     "col": 9,
+     "row": 1
+    },
+    {
+     "type": "PC_SIDE:left",
+     "col": 9,
+     "row": 3
+    },
+    {
+     "type": "WOODEN_CHAIR_SIDE",
+     "col": 6,
+     "row": 1
+    },
+    {
+     "type": "WOODEN_CHAIR_SIDE",
+     "col": 6,
+     "row": 3
+    },
+    {
+     "type": "WOODEN_CHAIR_SIDE:left",
+     "col": 10,
+     "row": 1
+    },
+    {
+     "type": "WOODEN_CHAIR_SIDE:left",
+     "col": 10,
+     "row": 3
+    },
+    {
+     "type": "PLANT_2",
+     "col": 11,
+     "row": 6
+    },
+    {
+     "type": "PLANT_2",
+     "col": 10,
+     "row": 6
+    },
+    {
+     "type": "WHITEBOARD",
+     "col": 0,
+     "row": -2
+    },
+    {
+     "type": "CLOCK",
+     "col": 2,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "pantry",
+   "label": "Pantry",
+   "zone": "pantry",
+   "w": 12,
+   "h": 9,
+   "floor": 9,
+   "floorColor": {
+    "h": 40,
+    "s": 30,
+    "b": -10,
+    "c": -20
+   },
+   "areaColor": "#e0a75e",
+   "seats": 16,
+   "furniture": [
+    {
+     "type": "SOFA_FRONT",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "SOFA_SIDE",
+     "col": 1,
+     "row": 2
+    },
+    {
+     "type": "COFFEE_TABLE",
+     "col": 2,
+     "row": 2
+    },
+    {
+     "type": "COFFEE",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "SOFA_SIDE:left",
+     "col": 4,
+     "row": 2
+    },
+    {
+     "type": "SOFA_BACK",
+     "col": 2,
+     "row": 4
+    },
+    {
+     "type": "SOFA_FRONT",
+     "col": 7,
+     "row": 1
+    },
+    {
+     "type": "SOFA_SIDE",
+     "col": 6,
+     "row": 2
+    },
+    {
+     "type": "COFFEE_TABLE",
+     "col": 7,
+     "row": 2
+    },
+    {
+     "type": "COFFEE",
+     "col": 7,
+     "row": 3
+    },
+    {
+     "type": "SOFA_SIDE:left",
+     "col": 9,
+     "row": 2
+    },
+    {
+     "type": "SOFA_BACK",
+     "col": 7,
+     "row": 4
+    },
+    {
+     "type": "FRIDGE",
+     "col": 11,
+     "row": 7
+    },
+    {
+     "type": "VENDING_MACHINE",
+     "col": 10,
+     "row": 7
+    },
+    {
+     "type": "WATER_COOLER",
+     "col": 9,
+     "row": 7
+    },
+    {
+     "type": "ARCADE",
+     "col": 8,
+     "row": 7
+    },
+    {
+     "type": "PLANT",
+     "col": 7,
+     "row": 7
+    },
+    {
+     "type": "SMALL_TABLE_FRONT",
+     "col": 1,
+     "row": 6
+    },
+    {
+     "type": "COFFEE",
+     "col": 1,
+     "row": 6
+    },
+    {
+     "type": "LARGE_PAINTING",
+     "col": 0,
+     "row": -2
+    },
+    {
+     "type": "CLOCK",
+     "col": 2,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "head",
+   "label": "Studio head",
+   "zone": "head",
+   "w": 12,
+   "h": 10,
+   "floor": 1,
+   "floorColor": {
+    "h": 209,
+    "s": 39,
+    "b": -25,
+    "c": -80
+   },
+   "areaColor": null,
+   "seats": 6,
+   "furniture": [
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_ON_1",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_ON_1",
+     "col": 6,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_ON_1",
+     "col": 10,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 5
+    },
+    {
+     "type": "PC_FRONT_ON_1",
+     "col": 2,
+     "row": 5
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 7
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 5
+    },
+    {
+     "type": "PC_FRONT_ON_1",
+     "col": 6,
+     "row": 5
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 7
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 5
+    },
+    {
+     "type": "PC_FRONT_ON_1",
+     "col": 10,
+     "row": 5
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 7
+    },
+    {
+     "type": "WATER_COOLER",
+     "col": 0,
+     "row": 5
+    },
+    {
+     "type": "PLANT",
+     "col": 0,
+     "row": 3
+    },
+    {
+     "type": "WHITEBOARD",
+     "col": 0,
+     "row": -2
+    },
+    {
+     "type": "CLOCK",
+     "col": 2,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "lab",
+   "label": "Lab / Server",
+   "zone": "dept",
+   "w": 13,
+   "h": 9,
+   "floor": 7,
+   "floorColor": {
+    "h": 10,
+    "s": 45,
+    "b": -40,
+    "c": -85
+   },
+   "areaColor": "#f0997b",
+   "seats": 6,
+   "furniture": [
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 10,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 10,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 6
+    },
+    {
+     "type": "SERVER_RACK",
+     "col": 12,
+     "row": 7
+    },
+    {
+     "type": "SERVER_RACK",
+     "col": 12,
+     "row": 5
+    },
+    {
+     "type": "SERVER_RACK",
+     "col": 12,
+     "row": 3
+    },
+    {
+     "type": "SERVER_RACK",
+     "col": 12,
+     "row": 1
+    },
+    {
+     "type": "CLOCK",
+     "col": 0,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "art",
+   "label": "Xưởng Art",
+   "zone": "dept",
+   "w": 10,
+   "h": 8,
+   "floor": 7,
+   "floorColor": {
+    "h": 25,
+    "s": 48,
+    "b": -43,
+    "c": -88
+   },
+   "areaColor": "#ed93b1",
+   "seats": 4,
+   "furniture": [
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 6
+    },
+    {
+     "type": "EASEL",
+     "col": 9,
+     "row": 6
+    },
+    {
+     "type": "EASEL",
+     "col": 8,
+     "row": 6
+    },
+    {
+     "type": "CACTUS",
+     "col": 7,
+     "row": 6
+    },
+    {
+     "type": "LARGE_PAINTING",
+     "col": 0,
+     "row": -2
+    },
+    {
+     "type": "SMALL_PAINTING_2",
+     "col": 2,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "audio",
+   "label": "Phòng thu",
+   "zone": "dept",
+   "w": 8,
+   "h": 9,
+   "floor": 9,
+   "floorColor": {
+    "h": 220,
+    "s": 10,
+    "b": -30,
+    "c": -20
+   },
+   "areaColor": "#85b7eb",
+   "seats": 2,
+   "furniture": [
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 6
+    },
+    {
+     "type": "SPEAKER",
+     "col": 7,
+     "row": 7
+    },
+    {
+     "type": "SPEAKER",
+     "col": 7,
+     "row": 5
+    },
+    {
+     "type": "PLANT_2",
+     "col": 0,
+     "row": 4
+    },
+    {
+     "type": "CLOCK",
+     "col": 0,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "qa",
+   "label": "Phòng test / QA",
+   "zone": "dept",
+   "w": 13,
+   "h": 8,
+   "floor": 9,
+   "floorColor": {
+    "h": 209,
+    "s": 0,
+    "b": -16,
+    "c": -8
+   },
+   "areaColor": "#97c459",
+   "seats": 6,
+   "furniture": [
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 1
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 10,
+     "row": 1
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 3
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 1,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 2,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 2,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 5,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 6,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 6,
+     "row": 6
+    },
+    {
+     "type": "DESK_FRONT",
+     "col": 9,
+     "row": 4
+    },
+    {
+     "type": "PC_FRONT_OFF",
+     "col": 10,
+     "row": 4
+    },
+    {
+     "type": "CUSHIONED_BENCH",
+     "col": 10,
+     "row": 6
+    },
+    {
+     "type": "TEST_RIG",
+     "col": 12,
+     "row": 6
+    },
+    {
+     "type": "TEST_RIG",
+     "col": 11,
+     "row": 6
+    },
+    {
+     "type": "BIN",
+     "col": 10,
+     "row": 7
+    },
+    {
+     "type": "WHITEBOARD",
+     "col": 0,
+     "row": -2
+    }
+   ]
+  },
+  {
+   "id": "empty",
+   "label": "Phòng trống",
+   "zone": "dept",
+   "w": 10,
+   "h": 8,
+   "floor": 7,
+   "floorColor": {
+    "h": 25,
+    "s": 48,
+    "b": -43,
+    "c": -88
+   },
+   "areaColor": "#b4b2a9",
+   "seats": 0,
+   "furniture": [
+    {
+     "type": "PLANT",
+     "col": 0,
+     "row": 3
+    }
+   ]
+  }
+ ]
+}

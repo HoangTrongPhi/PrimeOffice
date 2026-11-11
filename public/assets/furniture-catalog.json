@@ -266,6 +266,23 @@
     "groupId": "EASEL"
   },
   {
+    "id": "FRIDGE",
+    "name": "Fridge",
+    "label": "Fridge",
+    "category": "decor",
+    "file": "FRIDGE.png",
+    "furniturePath": "furniture/FRIDGE/FRIDGE.png",
+    "width": 16,
+    "height": 32,
+    "footprintW": 1,
+    "footprintH": 2,
+    "isDesk": false,
+    "canPlaceOnWalls": false,
+    "canPlaceOnSurfaces": false,
+    "backgroundTiles": 1,
+    "groupId": "FRIDGE"
+  },
+  {
     "id": "HANGING_PLANT",
     "name": "Hanging Plant",
     "label": "Hanging Plant",
@@ -689,6 +706,23 @@
     "canPlaceOnSurfaces": false,
     "backgroundTiles": 1,
     "groupId": "TEST_RIG"
+  },
+  {
+    "id": "VENDING_MACHINE",
+    "name": "Vending Machine",
+    "label": "Vending Machine",
+    "category": "decor",
+    "file": "VENDING_MACHINE.png",
+    "furniturePath": "furniture/VENDING_MACHINE/VENDING_MACHINE.png",
+    "width": 16,
+    "height": 32,
+    "footprintW": 1,
+    "footprintH": 2,
+    "isDesk": false,
+    "canPlaceOnWalls": false,
+    "canPlaceOnSurfaces": false,
+    "backgroundTiles": 1,
+    "groupId": "VENDING_MACHINE"
   },
   {
     "id": "WATER_COOLER",

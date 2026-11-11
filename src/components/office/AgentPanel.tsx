@@ -1,11 +1,11 @@
 import { EmptyState } from "@abyss/ui";
-import { Activity, Check, EyeOff, FolderOpen, Loader2, MessagesSquare, Pencil, SquareTerminal, X } from "lucide-react";
+import { Activity, Check, Crown, EyeOff, FolderOpen, Loader2, MessagesSquare, Pencil, SquareTerminal, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { ChatItem } from "../../lib/chatEvents";
 import { inTauri, ipc } from "../../lib/ipc";
 import { errorText, uiLog, useAppStore } from "../../stores/appStore";
 import { useChatStore } from "../../stores/chatStore";
-import { agentName, selectAgent, selectTerm, termOf, useOfficeUi, type AgentTab } from "../../stores/officeUiStore";
+import { agentName, isBoss, selectAgent, selectTerm, termOf, useOfficeUi, type AgentTab } from "../../stores/officeUiStore";
 import { termName, useTermStore, type TermTab } from "../../stores/termStore";
 import type { OfficeAgent } from "../../types/primeoffice";
 import { ChatItemView } from "../tabs/ChatTab";
@@ -125,7 +125,8 @@ function TermBody({ tab }: { tab: TermTab }) {
 export function AgentPanel({ agent }: { agent: OfficeAgent }) {
   const { session } = agent;
   const tabs = useTermStore((s) => s.tabs);
-  const { names, agentTab, setAgentTab, setName } = useOfficeUi();
+  const { names, tasks, bosses, agentTab, setAgentTab, setName, setTask, setBoss } = useOfficeUi();
+  const boss = isBoss(session, bosses);
   const linked = termOf(session, tabs);
   const claude = session.provider === "claude";
   const name = agentName(session, names, linked);
@@ -161,6 +162,28 @@ export function AgentPanel({ agent }: { agent: OfficeAgent }) {
           <span>{PROVIDER[session.provider] ?? session.provider}</span>
           {session.model && <span className="font-mono">{session.model}</span>}
           <span title={session.cwd}>{folderName(session.cwd)}</span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-ink-faint">
+          <span className="shrink-0">Task</span>
+          <input
+            key={tasks[session.sessionId] ?? ""}
+            className="h-6 min-w-0 flex-1 rounded border border-edge bg-canvas/70 px-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+            defaultValue={tasks[session.sessionId] ?? ""}
+            maxLength={60}
+            placeholder={session.title || "e.g. task001"}
+            title="The task shown under its name in the office (only in PrimeOffice). Empty: the session's title."
+            onBlur={(e) => setTask(session.sessionId, e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          />
+          <button
+            type="button"
+            className={boss ? "btn btn-primary" : "btn"}
+            aria-pressed={boss}
+            title={boss ? "The Boss of this folder: the agents added after it follow its briefing. Click to take the role away." : "Make this agent the Boss of its folder"}
+            onClick={() => setBoss(session.cwd, boss ? null : session.sessionId)}
+          >
+            <Crown className="size-3.5" /> Boss
+          </button>
         </div>
         <div className="flex flex-wrap gap-1.5">
           <button

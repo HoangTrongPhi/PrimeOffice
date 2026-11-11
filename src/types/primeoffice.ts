@@ -132,6 +132,8 @@ export interface OfficeSnapshot {
   existing: OfficeMessage;
   layout: Record<string, unknown> | null;
   activity: OfficeMessage[];
+  /** Room templates the user saved in Theme Studio (`lib/rooms.ts` `RoomTemplate`). */
+  roomTemplates: unknown[];
 }
 
 export interface OfficeAgent {
@@ -139,14 +141,15 @@ export interface OfficeAgent {
   session: AgentSession;
 }
 
-/** `studio_cmd::Studio`: one company in the Office tab, with its own floor and folders. */
+/** `studio_cmd::Studio`: one company in the Office tab, with its own floor and its project. */
 export interface Studio {
   /** `[a-z0-9-]`, unique. */
   id: string;
   name: string;
-  /** A `STUDIO_KINDS` id (lib/studios.ts): the floor plan and departments it starts from. */
+  /** A `STUDIO_KINDS` id (lib/studios.ts): the floor plans and departments it starts from. */
   kind: string;
-  /** Project folders whose agents work here; empty = every project. */
+  /** The project folder (one, with its own `.claude`) whose agents work here; empty = every project
+   *  (studios made before 0.4 only). */
   projects: string[];
 }
 

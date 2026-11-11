@@ -94,7 +94,7 @@ function checks(ready: boolean): ProjectCheck[] {
     c("folder.exists", "error", true, "Folder exists and can be read", ""),
     c("agent.sessions", "error", ready, "Agent sessions for this folder", "Start an agent in this exact folder once (e.g. `claude` in a terminal opened here)"),
     c("agent.instructions", "warn", ready, "Agent instructions (CLAUDE.md or AGENTS.md)", "Run /init in Claude Code inside this folder, or write CLAUDE.md by hand"),
-    c("agent.settings", "info", true, "Project agent settings (.claude/)", ""),
+    c("agent.settings", "info", ready, "Project agent settings (.claude/)", "Optional: create .claude/ for project settings, skills or agents"),
     c("vcs.git", "warn", true, "Git repository", "Run `git init` in this folder"),
     c("abyss.spec", "warn", ready, "Spec (docs/SPEC.md)", "Write docs/SPEC.md"),
     c("abyss.progress", "warn", false, "Progress log (docs/PROGRESS.md)", "Add docs/PROGRESS.md"),
@@ -144,9 +144,11 @@ interface MockOfficePrefs {
   areaMappings: Record<string, string[]>;
   /** By agent id here (ids are fixed in the mock); by transcript path in the real backend. */
   seats: Record<string, MockSeat>;
+  /** Room templates saved in Theme Studio. */
+  roomTemplates: unknown[];
 }
 const PREFS_KEY = "primeoffice.mock-office";
-const DEFAULT_PREFS: MockOfficePrefs = { soundEnabled: false, alwaysShowLabels: true, showAreas: false, areaMappings: {}, seats: {} };
+const DEFAULT_PREFS: MockOfficePrefs = { soundEnabled: false, alwaysShowLabels: true, showAreas: false, areaMappings: {}, seats: {}, roomTemplates: [] };
 function loadPrefs(): MockOfficePrefs {
   try {
     return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") };
@@ -363,6 +365,7 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
             existing: { type: "existingAgents", agents: shown, agentMeta: byId(meta), directoryNames: byId((id) => DIRS[id]), externalAgents: byId(() => true) },
             layout: mockLayout(),
             activity: activity.filter((m) => !hidden.has(m.id as number)),
+            roomTemplates: prefs.roomTemplates,
           };
         }
         case "office_send": {
@@ -399,6 +402,10 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
               break;
             case "saveAgentSeats":
               prefs = { ...prefs, seats: { ...prefs.seats, ...(m.seats as Record<string, MockSeat>) } };
+              break;
+            case "saveRoomTemplates":
+              if (!Array.isArray(m.templates)) throw "saveRoomTemplates without `templates`";
+              prefs = { ...prefs, roomTemplates: m.templates };
               break;
             default:
               return null;
@@ -534,6 +541,16 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
           const next = a.studios as Studios;
           if (!next?.studios?.length) throw "At least one studio is needed";
           if (next.studios.some((s) => !s.name.trim())) throw "A studio needs a name";
+          // studio_cmd::check_new_projects: one project, with .claude, in one studio only.
+          const key = (p: string) => p.replace(/[\\/]+$/, "").toLowerCase();
+          for (const s of next.studios) {
+            if (s.projects.length > 1) throw `Studio ${s.name} follows one project; it was given ${s.projects.length}`;
+            const folder = s.projects[0];
+            if (!folder || studios.studios.find((c) => c.id === s.id)?.projects.some((p) => key(p) === key(folder))) continue;
+            if (!report(folder).checks.find((c) => c.code === "agent.settings")?.passed) throw `${folder} has no .claude folder: a studio follows a Claude Code project (run Claude Code there once, or create .claude)`;
+            const other = next.studios.find((o) => o.id !== s.id && o.projects.some((p) => key(p) === key(folder)));
+            if (other) throw `${folder} is already the project of ${other.name}`;
+          }
           for (const gone of studios.studios.filter((s) => !next.studios.some((n) => n.id === s.id))) localStorage.removeItem(layoutKey(gone.id));
           studios = { active: next.studios.some((s) => s.id === next.active) ? next.active : next.studios[0].id, studios: next.studios.map((s) => ({ ...s, name: s.name.trim() })) };
           try {

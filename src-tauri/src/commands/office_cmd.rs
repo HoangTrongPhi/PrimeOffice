@@ -18,6 +18,7 @@ use crate::utils::logbus::{self, Level};
 /// Event name; keep in sync with `EVENTS.office` in `src/lib/ipc.ts`. Payload: an array of messages.
 pub const OFFICE_EVENT: &str = "office://message";
 const TICK: Duration = Duration::from_millis(1000);
+const ROOM_TEMPLATES_MAX: usize = 50;
 
 /// What the office UI changes by itself and expects back on every load: its Settings menu, where
 /// agents sit and which folder belongs to which area. Saved in `office.json` next to `layout.json`.
@@ -31,11 +32,14 @@ pub struct OfficePrefs {
     pub area_mappings: BTreeMap<String, Vec<String>>,
     /// Transcript path → seat (pixel-agents' `saveAgentSeats`, re-keyed from agent ids).
     pub seats: BTreeMap<String, Seat>,
+    /// Room templates the user saved in Theme Studio (`src/lib/rooms.ts` `RoomTemplate`), kept as
+    /// the UI sends them.
+    pub room_templates: Vec<Value>,
 }
 
 impl Default for OfficePrefs {
     fn default() -> Self {
-        OfficePrefs { sound_enabled: false, always_show_labels: true, show_areas: false, area_mappings: BTreeMap::new(), seats: BTreeMap::new() }
+        OfficePrefs { sound_enabled: false, always_show_labels: true, show_areas: false, area_mappings: BTreeMap::new(), seats: BTreeMap::new(), room_templates: Vec::new() }
     }
 }
 
@@ -135,6 +139,8 @@ pub struct OfficeSnapshot {
     pub layout: Option<Value>,
     /// Tools, bubbles and gauges, sent after the layout.
     pub activity: Vec<Value>,
+    /// The user's own room templates (Theme Studio).
+    pub room_templates: Vec<Value>,
 }
 
 #[tauri::command]
@@ -142,7 +148,7 @@ pub fn office_snapshot<R: Runtime>(app: AppHandle<R>, office: State<'_, OfficeSt
     let layout = std::fs::read_to_string(layout_path(&app, &office, None)?).ok().and_then(|s| serde_json::from_str::<Value>(&s).ok()).filter(Value::is_object);
     let (existing, activity) = office.observer.lock().map_err(|e| e.to_string())?.snapshot();
     let prefs = office.prefs.lock().map_err(|e| e.to_string())?;
-    Ok(OfficeSnapshot { settings: settings_message(&prefs), area_mappings: json!({ "type": "areaMappingsLoaded", "mappings": prefs.area_mappings }), existing, layout, activity })
+    Ok(OfficeSnapshot { settings: settings_message(&prefs), area_mappings: json!({ "type": "areaMappingsLoaded", "mappings": prefs.area_mappings }), existing, layout, activity, room_templates: prefs.room_templates.clone() })
 }
 
 /// A `ClientMessage` from the office UI. The office only observes (agents are started from the Chat
@@ -189,6 +195,16 @@ pub fn apply_pref_message(prefs: &mut OfficePrefs, observer: &mut Observer, mess
         Some("setShowAreas") => prefs.show_areas = flag()?,
         Some("saveAreaMappings") => {
             prefs.area_mappings = serde_json::from_value(message.get("mappings").cloned().unwrap_or(Value::Null)).map_err(|e| format!("saveAreaMappings: {e}"))?;
+        }
+        Some("saveRoomTemplates") => {
+            let list = message.get("templates").and_then(Value::as_array).ok_or("saveRoomTemplates without `templates`")?;
+            if list.len() > ROOM_TEMPLATES_MAX {
+                return Err(format!("At most {ROOM_TEMPLATES_MAX} room templates"));
+            }
+            if list.iter().any(|t| !t.is_object() || t.get("id").and_then(Value::as_str).is_none()) {
+                return Err("saveRoomTemplates: every template needs an id".into());
+            }
+            prefs.room_templates = list.clone();
         }
         Some("saveAgentSeats") => {
             let raw: HashMap<String, Seat> = serde_json::from_value(message.get("seats").cloned().unwrap_or(Value::Null)).map_err(|e| format!("saveAgentSeats: {e}"))?;
@@ -264,6 +280,12 @@ mod tests {
         assert!(apply_pref_message(&mut prefs, &mut obs, &json!({ "type": "saveAreaMappings", "mappings": { "Game": ["Studio"] } })).unwrap());
         assert!(!apply_pref_message(&mut prefs, &mut obs, &json!({ "type": "focusAgent", "id": 1 })).unwrap());
         assert!(apply_pref_message(&mut prefs, &mut obs, &json!({ "type": "setSoundEnabled" })).is_err());
+        // The user's room templates (Theme Studio): kept as sent, each with an id, at most 50.
+        let tpl = json!({ "id": "mine-1", "label": "Phòng code", "w": 9, "h": 7, "furniture": [] });
+        assert!(apply_pref_message(&mut prefs, &mut obs, &json!({ "type": "saveRoomTemplates", "templates": [tpl.clone()] })).unwrap());
+        assert_eq!(prefs.room_templates, vec![tpl]);
+        assert!(apply_pref_message(&mut prefs, &mut obs, &json!({ "type": "saveRoomTemplates", "templates": [{ "label": "no id" }] })).is_err());
+        assert!(apply_pref_message(&mut prefs, &mut obs, &json!({ "type": "saveRoomTemplates", "templates": vec![json!({ "id": "x" }); 51] })).is_err());
         let m = settings_message(&prefs);
         assert_eq!((m["soundEnabled"].as_bool(), m["alwaysShowLabels"].as_bool(), m["showAreas"].as_bool()), (Some(true), Some(false), Some(true)));
 

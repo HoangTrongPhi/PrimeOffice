@@ -38,7 +38,8 @@ export interface OpenOptions {
   permissionMode?: string | null;
   name?: string;
   /** Text typed into the program once it has started and gone quiet, then Enter: the agent's
-   *  first task. Only what the user wrote for this agent. */
+   *  first message. What the user wrote for this agent, after its role's briefing text (lib/briefing.ts)
+   *  when it has a role — the Add agent form shows the whole message before it starts. */
   firstTask?: string;
 }
 

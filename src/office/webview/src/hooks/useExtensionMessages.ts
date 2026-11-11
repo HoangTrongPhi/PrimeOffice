@@ -314,6 +314,23 @@ export function useExtensionMessages(
         return;
       }
 
+      // PrimeOffice patch (docs/UPSTREAM_PATCHES.md): the shell names the agents (name, task, Boss).
+      if (msg.type === 'agentLabels') {
+        const labels = (msg.labels || {}) as Record<
+          string,
+          { name?: string; task?: string; boss?: boolean }
+        >;
+        for (const [id, label] of Object.entries(labels)) {
+          const ch = os.characters.get(Number(id));
+          if (!ch || ch.isSubagent) continue;
+          ch.agentName = label.name || undefined;
+          ch.taskName = label.task || undefined;
+          // The Boss is the folder's director: it moves to the directors' room.
+          os.setAgentBoss(Number(id), label.boss === true);
+        }
+        return;
+      }
+
       if (msg.type === 'layoutLoaded') {
         // Skip external layout updates while editor has unsaved changes
         if (layoutReadyRef.current && isEditDirty?.()) {

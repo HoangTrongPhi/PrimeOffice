@@ -3,17 +3,18 @@ import { Building2, FolderOpen, LayoutGrid, PanelRightClose, PanelRightOpen, Plu
 import { useEffect, useRef, useState } from "react";
 import { handleHelpKey } from "../../hooks/useGlobalHotkeys";
 import { pickPaths } from "../../lib/dialogs";
-import { inTauri, ipc } from "../../lib/ipc";
-import { kindOf, STUDIO_KINDS, studioHasProject } from "../../lib/studios";
+import { inTauri } from "../../lib/ipc";
+import { kindOf, planFileOf, projectBlocker, STUDIO_KINDS, studioHasProject } from "../../lib/studios";
 import { errorText, uiLog } from "../../stores/appStore";
 import { connectOfficeFrame } from "../../office/bridge/officeBridge";
 import { useOfficeStore, useProjectStore, useStudioStore } from "../../stores/dataStore";
-import { selectAgent, useOfficeUi } from "../../stores/officeUiStore";
+import { agentName, agentTask, isBoss, selectAgent, termOf, useOfficeUi } from "../../stores/officeUiStore";
 import { useTermStore } from "../../stores/termStore";
 import { AddAgentModal } from "../office/AddAgentModal";
 import { AgentPanel, TermPanel } from "../office/AgentPanel";
 import { AgentStrip } from "../office/AgentStrip";
 import { CommandCenter } from "../office/CommandCenter";
+import { loadFloorPlan, ThemeStudio } from "../office/ThemeStudio";
 import { folderName } from "../session/SessionView";
 
 const WINDOWS = [15, 30, 60, 240, 1440];
@@ -23,15 +24,6 @@ export const CHARACTER_PACKS: { id: string; label: string }[] = [
 ];
 
 const FIELD = "h-7 rounded-md border border-edge bg-canvas/70 px-2 text-[12px] text-ink";
-
-/** Replace a studio's saved office layout with a floor plan. */
-async function loadFloorPlan(file: string, studio: string) {
-  const layout = await fetch(`${import.meta.env.BASE_URL}assets/${file}`).then((r) => {
-    if (!r.ok) throw new Error(`${file}: ${r.status}`);
-    return r.json() as Promise<unknown>;
-  });
-  if (inTauri) await ipc.officeSend({ type: "saveLayout", layout, studio });
-}
 
 /** Office documents that already pass F1 on (each reload of the frame is a new document). */
 const helpKeyDocs = new WeakSet<Document>();
@@ -102,15 +94,17 @@ export function OfficeTab() {
   const tabs = useTermStore((s) => s.tabs);
   const [floorOpen, setFloorOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [newKind, setNewKind] = useState("video");
+  const [newKind, setNewKind] = useState("game");
+  const [newTheme, setNewTheme] = useState(0);
   const [newName, setNewName] = useState("");
+  const [newProject, setNewProject] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const studio = studios.find((s) => s.id === active) ?? studios[0] ?? null;
   const studioId = studio?.id ?? null;
-  const planFile = studio ? kindOf(studio.kind).file : null;
+  const planFile = studio ? planFileOf(studio.kind) : null;
 
   useEffect(() => {
     void useProjectStore.getState().load();
@@ -154,6 +148,18 @@ export function OfficeTab() {
     return () => clearInterval(t);
   }, [refreshAgents]);
 
+  // The office labels its characters with what the shell knows: the agent's name, its task, the Boss.
+  // Sent on every refresh (the frame ignores ids it has no character for yet).
+  const { names, tasks, bosses } = useOfficeUi();
+  useEffect(() => {
+    const labels: Record<number, { name: string; task: string; boss: boolean }> = {};
+    for (const { id, session } of agents) {
+      const name = agentName(session, names, termOf(session, tabs));
+      labels[id] = { name, task: agentTask(session, tasks, name), boss: isBoss(session, bosses) };
+    }
+    frameRef.current?.contentWindow?.postMessage({ type: "agentLabels", labels }, "*");
+  }, [agents, names, tasks, bosses, tabs, frameKey, studioId, pack]);
+
   const selected = agents.find((a) => a.id === selectedId) ?? null;
   // A terminal card turns into its agent's card once its session has a character.
   const termTab = term !== null ? tabs.find((t) => t.key === term) : undefined;
@@ -168,10 +174,18 @@ export function OfficeTab() {
     setConfirmDelete(false);
     setEditOpen(true);
   };
-  const toggleFolder = (path: string) => {
-    if (!studio) return;
-    const has = studio.projects.some((p) => p.toLowerCase() === path.toLowerCase());
-    void store.update(studio.id, { projects: has ? studio.projects.filter((p) => p.toLowerCase() !== path.toLowerCase()) : [...studio.projects, path] });
+  const hasClaude = (p: { checks: { code: string; passed: boolean }[] }) => p.checks.some((c) => c.code === "agent.settings" && c.passed);
+  /** Opened projects with why each one cannot be this studio's project (null = it can). */
+  const projectChoices = (except?: string) => projects.map((p) => ({ p, why: projectBlocker(p.path, hasClaude(p), studios, except) }));
+  const createStudio = async () => {
+    const id = await store.add(newKind, newName || folderName(newProject), newProject);
+    if (!id) return;
+    setAddOpen(false);
+    const theme = kindOf(newKind).themes[newTheme];
+    if (newTheme > 0 && theme) {
+      await loadFloorPlan(theme.file, id).catch((e) => uiLog("error", `Cannot load the theme: ${errorText(e)}`));
+      setFrameKey((k) => k + 1);
+    }
   };
 
   return (
@@ -185,7 +199,7 @@ export function OfficeTab() {
               type="button"
               role="tab"
               aria-selected={on}
-              title={`${s.name} — ${kindOf(s.kind).label}${s.projects.length ? `, ${s.projects.length} folder${s.projects.length === 1 ? "" : "s"}` : ", every project"}`}
+              title={`${s.name} — ${kindOf(s.kind).label}, ${s.projects[0] ? `project ${s.projects[0]}` : "no project chosen (every project)"}`}
               className={`-mb-px flex max-w-[200px] items-center gap-1.5 rounded-t-md border px-3 py-1.5 text-[12.5px] ${on ? "border-edge border-b-transparent bg-canvas font-medium text-ink" : "border-transparent text-ink-faint hover:text-ink"}`}
               onClick={() => void store.setActive(s.id)}
             >
@@ -197,18 +211,20 @@ export function OfficeTab() {
         <button
           type="button"
           className="mb-1 ml-1 flex size-6 items-center justify-center rounded-md text-ink-faint hover:bg-tint/6 hover:text-ink"
-          title="New studio: another company with its own floor and folders"
+          title="New studio: another company with its own floor, following one project"
           aria-label="New studio"
           onClick={() => {
-            setNewKind("video");
+            setNewKind("game");
+            setNewTheme(0);
             setNewName("");
+            setNewProject(projectChoices().find((c) => !c.why)?.p.path ?? "");
             setAddOpen(true);
           }}
         >
           <Plus className="size-4" />
         </button>
         <div className="flex-1" />
-        <button type="button" className="btn mb-1" disabled={!studio} onClick={openEdit} title="This studio: name, folders, delete">
+        <button type="button" className="btn mb-1" disabled={!studio} onClick={openEdit} title="This studio: name, project, delete">
           <Settings2 className="size-3.5" /> Studio…
         </button>
       </div>
@@ -217,7 +233,7 @@ export function OfficeTab() {
         <label className="flex items-center gap-1.5 text-[12px] text-ink-faint">
           Project
           <select className={FIELD} value={project ?? ""} onChange={(e) => setProject(e.target.value || null)}>
-            <option value="">{studio?.projects.length ? "All of this studio" : "All projects"}</option>
+            <option value="">{studio?.projects.length ? `${folderName(studio.projects[0])} (this studio)` : "All projects"}</option>
             {readyProjects.map((p) => (
               <option key={p.path} value={p.path}>
                 {p.name}
@@ -256,8 +272,8 @@ export function OfficeTab() {
             ))}
           </select>
         </label>
-        <button type="button" className="btn" disabled={!studio} onClick={() => setFloorOpen(true)} title="Floor plan: replace this studio's office with a plan">
-          <LayoutGrid className="size-3.5" /> Floor plan…
+        <button type="button" className="btn" disabled={!studio} onClick={() => setFloorOpen(true)} title="Theme Studio: change this studio's floor, add rooms from templates, keep rooms as templates">
+          <LayoutGrid className="size-3.5" /> Theme Studio…
         </button>
         <div className="flex-1" />
         <PillBadge tone={agents.length ? "accent" : "neutral"}>
@@ -268,33 +284,81 @@ export function OfficeTab() {
         </button>
       </div>
 
-      <Modal open={addOpen} title="New studio" onClose={() => setAddOpen(false)}>
+      <Modal open={addOpen} title="New studio" onClose={() => setAddOpen(false)} className="max-h-[calc(100vh-3rem)] max-w-xl">
         <form
-          className="flex flex-col gap-3 p-4 text-[12.5px] text-ink-muted"
+          className="flex flex-col gap-3 text-[12.5px] text-ink-muted"
           onSubmit={(e) => {
             e.preventDefault();
-            void store.add(newKind, newName).then((ok) => ok && setAddOpen(false));
+            if (newProject) void createStudio();
           }}
         >
-          <p>A studio is a company of its own: its floor, its departments and the project folders whose agents work there.</p>
-          {STUDIO_KINDS.map((k) => (
-            <label key={k.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${newKind === k.id ? "border-accent" : "border-edge"}`}>
-              <input type="radio" name="studio-kind" className="mt-1" checked={newKind === k.id} onChange={() => setNewKind(k.id)} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-medium text-ink">{k.label}</span>
-                <span className="mt-0.5 block">{k.text}</span>
-              </span>
-            </label>
-          ))}
+          <p>
+            A studio is a company of its own: its floor and departments, following one Claude Code project — a folder with its own <code>.claude</code>. A folder can be the project of one studio only.
+          </p>
+          <div>
+            <div className="text-[13px] font-medium text-ink">Project</div>
+            {projects.length === 0 ? (
+              <p className="mt-1 text-ink-faint">No project folder opened yet: open one first.</p>
+            ) : (
+              <ul className="mt-1.5 flex max-h-44 flex-col gap-1 overflow-y-auto">
+                {projectChoices().map(({ p, why }) => (
+                  <li key={p.path}>
+                    <label className={`flex items-center gap-2 rounded-md border px-2 py-1 ${why ? "cursor-not-allowed border-transparent opacity-55" : newProject === p.path ? "cursor-pointer border-accent" : "cursor-pointer border-transparent hover:bg-tint/4"}`}>
+                      <input type="radio" name="studio-project" disabled={!!why} checked={newProject === p.path} onChange={() => setNewProject(p.path)} />
+                      <span className="text-ink">{p.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-[11px] text-ink-faint">{p.path}</span>
+                      <span className={`shrink-0 text-[11px] ${why ? "text-danger" : "text-ink-faint"}`}>{why ?? ".claude ✓"}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button type="button" className="btn mt-1.5" onClick={() => void pickPaths("folder")} title="Open a project folder (or drop one on the window)">
+              <FolderOpen className="size-3.5" /> Open folder…
+            </button>
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="text-[13px] font-medium text-ink">Kind and theme</div>
+            {STUDIO_KINDS.map((k) => (
+              <div key={k.id} className={`rounded-lg border p-3 ${newKind === k.id ? "border-accent" : "border-edge"}`}>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="radio"
+                    name="studio-kind"
+                    className="mt-1"
+                    checked={newKind === k.id}
+                    onChange={() => {
+                      setNewKind(k.id);
+                      setNewTheme(0);
+                    }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-medium text-ink">{k.label}</span>
+                    <span className="mt-0.5 block">{k.text}</span>
+                  </span>
+                </label>
+                {newKind === k.id && k.themes.length > 1 && (
+                  <div className="mt-2 ml-7 flex flex-wrap gap-3">
+                    {k.themes.map((t, i) => (
+                      <label key={t.id} className="flex cursor-pointer items-center gap-1.5" title={t.text}>
+                        <input type="radio" name="studio-theme" checked={newTheme === i} onChange={() => setNewTheme(i)} />
+                        <span className="text-ink">{t.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
           <label className="flex items-center gap-2">
             <span className="w-12 shrink-0 text-ink-faint">Name</span>
-            <input className={`${FIELD} flex-1`} value={newName} maxLength={40} placeholder={kindOf(newKind).label} onChange={(e) => setNewName(e.target.value)} />
+            <input className={`${FIELD} flex-1`} value={newName} maxLength={40} placeholder={newProject ? folderName(newProject) : kindOf(newKind).label} onChange={(e) => setNewName(e.target.value)} />
           </label>
           <div className="flex justify-end gap-2">
             <button type="button" className="btn" onClick={() => setAddOpen(false)}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
+            <button type="submit" className="btn btn-primary" disabled={!newProject} title={newProject ? "" : "Choose the studio's project first"}>
               Create studio
             </button>
           </div>
@@ -318,28 +382,33 @@ export function OfficeTab() {
               </button>
             </form>
             <div>
-              <div className="text-[13px] font-medium text-ink">Folders</div>
+              <div className="text-[13px] font-medium text-ink">Project</div>
               <p className="mt-0.5">
-                Agents working in the ticked folders appear in this studio. {studio.projects.length === 0 ? "None ticked: it shows every project." : ""}
+                {studio.projects[0] ? (
+                  <>
+                    Agents of <b className="text-ink">{studio.projects[0]}</b> work in this studio.
+                  </>
+                ) : (
+                  "No project chosen: this studio (made before 0.4) shows every project. Choose its project:"
+                )}
               </p>
-              {projects.length === 0 ? (
-                <p className="mt-2 text-ink-faint">No project folder opened yet — use Open folder… or the Projects tab first.</p>
-              ) : (
-                <ul className="mt-2 flex max-h-48 flex-col gap-1 overflow-y-auto">
-                  {projects.map((p) => (
-                    <li key={p.path}>
-                      <label className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 hover:bg-tint/4">
-                        <input type="checkbox" checked={studio.projects.some((x) => x.toLowerCase() === p.path.toLowerCase())} onChange={() => toggleFolder(p.path)} />
-                        <span className="text-ink">{p.name}</span>
-                        <span className="min-w-0 flex-1 truncate text-[11px] text-ink-faint">{p.path}</span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <select
+                className={`${FIELD} mt-2 w-full`}
+                value={studio.projects[0] ?? ""}
+                onChange={(e) => e.target.value && void store.update(studio.id, { projects: [e.target.value] })}
+                aria-label="Project of this studio"
+              >
+                {!studio.projects[0] && <option value="">Choose a project…</option>}
+                {projectChoices(studio.id).map(({ p, why }) => (
+                  <option key={p.path} value={p.path} disabled={!!why}>
+                    {p.name} — {p.path}
+                    {why ? ` (${why})` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex items-center gap-2 border-t border-edge pt-3">
-              <span className="flex-1">{kindOf(studio.kind).label}. Its floor is edited with the office's Layout button, or replaced with Floor plan….</span>
+              <span className="flex-1">{kindOf(studio.kind).label}. Arrange its floor with the office's Layout button; change the theme or add rooms with Theme Studio….</span>
               {studios.length > 1 &&
                 (confirmDelete ? (
                   <button
@@ -362,37 +431,7 @@ export function OfficeTab() {
         )}
       </Modal>
 
-      <Modal open={floorOpen} title="Floor plan" onClose={() => setFloorOpen(false)}>
-        <div className="flex flex-col gap-3 p-4 text-[12.5px] text-ink-muted">
-          <p>
-            Loading a floor plan replaces the office layout of <b className="text-ink">{studio?.name}</b> (furniture, floors, areas). Edit it afterwards with the office's Layout button.
-          </p>
-          {STUDIO_KINDS.map((f) => (
-            <div key={f.id} className="flex items-start gap-3 rounded-lg border border-edge p-3">
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-medium text-ink">{f.label}</div>
-                <div className="mt-0.5">{f.text}</div>
-              </div>
-              <button
-                type="button"
-                className={f.id === studio?.kind ? "btn btn-primary" : "btn"}
-                onClick={() => {
-                  if (!studio) return;
-                  setFloorOpen(false);
-                  loadFloorPlan(f.file, studio.id)
-                    .then(() => {
-                      uiLog("info", `${studio.name} floor plan: ${f.label}`);
-                      setFrameKey((k) => k + 1);
-                    })
-                    .catch((e) => uiLog("error", `Cannot load the floor plan: ${errorText(e)}`));
-                }}
-              >
-                Load
-              </button>
-            </div>
-          ))}
-        </div>
-      </Modal>
+      <ThemeStudio open={floorOpen} studio={studio} onClose={() => setFloorOpen(false)} onChanged={() => setFrameKey((k) => k + 1)} />
 
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1 bg-[#1e1e2e]">
