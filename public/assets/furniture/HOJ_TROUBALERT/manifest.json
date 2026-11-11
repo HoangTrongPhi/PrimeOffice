@@ -1,0 +1,13 @@
+{
+  "id": "HOJ_TROUBALERT",
+  "name": "Alert Monitor",
+  "category": "wall",
+  "type": "asset",
+  "canPlaceOnWalls": true,
+  "canPlaceOnSurfaces": false,
+  "backgroundTiles": 0,
+  "width": 96,
+  "height": 32,
+  "footprintW": 6,
+  "footprintH": 2
+}

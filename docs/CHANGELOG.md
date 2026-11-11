@@ -2,6 +2,31 @@
 
 All user-visible changes. Newest first; one section per released version.
 
+## 0.6.0 — 2026-11-11
+
+- **Avatars**: Add agent → Identity → **Avatar** picks how the agent looks in the office — Auto (one of the crew,
+  as before), any character of the project (Classic crew, PrimeOffice crew) or a themed one: **DC**, **Marvel**,
+  **Dragon Ball**, **Naruto** (8 each), **Lễ hội** (Santa, elf, witch, vampire, pumpkin, skeleton, Ông Đồ, áo dài)
+  and **Cyber & Sea** (netrunner, operator, agent, diver, mermaid, robot…). Picking a themed avatar fills an empty
+  name. Change it later with the avatar button on the agent's card. Sub-agents keep the crew look of their parent.
+- **Special themes** in Theme Studio, each one Campus or Open Floor room for room (same departments, seats,
+  Pantry, Ban giám đốc), with themed furniture and an effect over the floor: **Lễ hội** — Christmas (snow),
+  Halloween (bats and fog), Tết (peach petals, fireworks); **Phong cách** — Cyberpunk (neon rain), Matrix (code
+  rain), Aquarium (bubbles, light ripples).
+- **DC themes with maps and art of their own** (every department still there, rooms named "<room> · <department>"):
+  **BatCave** — the cave computer with its giant screen over Gotham and six feeds, the Armory of suit tubes (Batman,
+  Robin, Nightwing, Batgirl, Batwoman, Red Hood, Jason's memorial suit, the heavy armour), the Trophy Hall (T-rex,
+  penny, Joker card, Alfred's tea), the Batmobile Garage (car on its turntable, armoured car, Batcycle, Batwing),
+  Nightwing's and Robin's rooms, Oracle's Nest, the Forensics Lab, Case Files, Comms, the Training Ground and the
+  Waterfall Cavern; bats and drips. **Hall of Justice** — the Great Hall with the founders in marble around their
+  fountain, the Round Table under the alert monitor, the Teleporter Bay, Themyscira Hall, Cyborg's Lab, the Speed
+  Lab (cosmic treadmill), the Rock of Eternity, the Atlantis Grotto, the Lantern Corps, the Hall of Heroes and the
+  Trophy Room with Starro; glints of light. Their desks, chairs and screens are their own too.
+- Nine more DC avatars: Robin, Nightwing, Batgirl, Batwoman, Red Hood, Martian Manhunter, Shazam, Green Arrow, Hawkman. **Effects** (top bar) turns the effect
+  off or on; it is off by itself when the system asks for reduced motion. Theme Studio marks the theme that is on.
+- Fixed: an agent's name, task and Boss label set before the office had drawn its characters (after a reload or a
+  new studio) did not show until something else changed.
+
 ## 0.5.0 — 2026-11-11
 
 - **One project per studio**: a new studio follows exactly one Claude Code project — a folder with its own

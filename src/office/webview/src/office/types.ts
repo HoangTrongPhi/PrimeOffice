@@ -253,6 +253,8 @@ export interface Character {
   taskName?: string;
   /** PrimeOffice: the Boss of its project folder. */
   isBoss?: boolean;
+  /** PrimeOffice: the crew palette the office picked, kept while an avatar is worn (seats save it). */
+  crewPalette?: { palette: number; hueShift: number };
   /** Whether this agent is the team lead */
   isTeamLead?: boolean;
   /** ID of the lead agent (set on teammates) */

@@ -239,6 +239,9 @@ export interface FurnitureAssetMessage {
 export interface CharacterSpritesLoaded {
   type: 'characterSpritesLoaded';
   characters: CharacterSpriteSet[];
+  /** PrimeOffice: the first `crewCount` are the crew; `characterKeys[i]` is the file of characters[i]. */
+  crewCount?: number;
+  characterKeys?: string[];
 }
 
 export interface CharacterSpriteSet {

@@ -26,7 +26,16 @@ export interface OfficeAssetIndex {
   characters: string[];
   /** Pack name → files relative to assets/characters (spec P4). */
   characterPacks: Record<string, string[]>;
+  /** Add agent → Avatar: crew packs, then themed groups (scripts/gen-avatars.py). Files relative to assets/characters. */
+  avatarGroups?: AvatarGroup[];
   defaultLayout: string | null;
+}
+
+export interface AvatarGroup {
+  id: string;
+  label: string;
+  crew?: boolean;
+  items: { id: string; name: string; file: string }[];
 }
 
 export interface OfficeAssets {
@@ -89,7 +98,11 @@ export async function loadOfficeAssets(pack = "classic"): Promise<OfficeAssets> 
     fetch(`${base}assets/asset-index.json`).then((r) => r.json() as Promise<OfficeAssetIndex>),
     fetch(`${base}assets/furniture-catalog.json`).then((r) => r.json() as Promise<CatalogEntry[]>),
   ]);
-  const chars = index.characterPacks?.[pack] ?? index.characterPacks?.classic ?? index.characters;
+  const crew = index.characterPacks?.[pack] ?? index.characterPacks?.classic ?? index.characters;
+  // The crew comes first (agents without an avatar get one of these, as before); every other avatar
+  // follows, so an agent can wear any of them (`agentLabels` → avatar, by file).
+  const extra = (index.avatarGroups ?? []).flatMap((g) => g.items.map((it) => it.file)).filter((f) => !crew.includes(f));
+  const chars = [...crew, ...new Set(extra)];
   const [characters, floors, walls, carpets, furniture, defaultLayout] = await Promise.all([
     Promise.all(chars.map(decodeCharacter)),
     Promise.all(index.floors.map(async (f) => readSprite(await decodePng(`${base}assets/floors/${f}`), FLOOR_TILE_SIZE, FLOOR_TILE_SIZE))),
@@ -103,7 +116,7 @@ export async function loadOfficeAssets(pack = "classic"): Promise<OfficeAssets> 
     defaultLayout,
     // Load order matters: characters → floors → walls → carpets → furniture (then the layout).
     messages: [
-      { type: "characterSpritesLoaded", characters },
+      { type: "characterSpritesLoaded", characters, crewCount: crew.length, characterKeys: chars },
       { type: "floorTilesLoaded", sprites: floors },
       { type: "wallTilesLoaded", sets: walls },
       { type: "carpetTilesLoaded", sets: carpets },

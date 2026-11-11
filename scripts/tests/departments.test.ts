@@ -103,3 +103,14 @@ test("ranks and who briefs a new sub-agent", () => {
   assert.equal(briefer({ tier: null, dept: null }, [td]), -1, "general-purpose is not briefed");
   assert.equal(briefer(gp, []), -1);
 });
+
+test("themed rooms keep their department after a '·'", () => {
+  const labels = ["Robin's Room · Art", "Trophy Hall · Pantry", "Briefing Platform · Phòng họp", "Bat-Family Council · Ban giám đốc", "Armory", "Lucius' Workshop · Engineering"];
+  assert.deepEqual(areaTiersFor("technical-artist", labels, {}), [["Robin's Room · Art"]]);
+  assert.deepEqual(areaTiersFor("gameplay-programmer", labels, {}), [["Lucius' Workshop · Engineering"]]);
+  assert.deepEqual(venueAreas("lounge", labels), ["Trophy Hall · Pantry"]);
+  assert.deepEqual(venueAreas("meeting", labels), ["Briefing Platform · Phòng họp"]);
+  assert.deepEqual(directorAreas(labels), ["Bat-Family Council · Ban giám đốc"]);
+  // A plain label that only contains a department word is not that department.
+  assert.deepEqual(areaTiersFor("technical-artist", ["Armory", "Artemis"], {}), []);
+});

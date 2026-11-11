@@ -1,0 +1,13 @@
+{
+  "id": "BC_MAIN_SCREEN",
+  "name": "Cave Computer — Main Screen",
+  "category": "decor",
+  "type": "asset",
+  "canPlaceOnWalls": false,
+  "canPlaceOnSurfaces": false,
+  "backgroundTiles": 4,
+  "width": 160,
+  "height": 80,
+  "footprintW": 10,
+  "footprintH": 5
+}

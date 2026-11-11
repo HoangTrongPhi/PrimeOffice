@@ -145,6 +145,17 @@ export function normalizeLabel(label: string): string {
     .replace(/\d+$/, '');
 }
 
+/**
+ * Compare forms of an Area label: the whole label and, for a themed room such as "Robin's Room · Art"
+ * or "Trophy Hall · Pantry", each part between "·" / "|" / "—" (so the room keeps its department).
+ */
+export function labelForms(label: string): string[] {
+  const parts = label.split(/[·|—]/);
+  const forms = [normalizeLabel(label)];
+  if (parts.length > 1) for (const p of parts) forms.push(normalizeLabel(p));
+  return forms.filter(Boolean);
+}
+
 /** The department of an agent type, or null (built-in agents such as `general-purpose`, `Explore`). */
 export function departmentOf(agentType: string | undefined): Department | null {
   if (!agentType) return null;
@@ -178,8 +189,7 @@ export function areaTiersFor(
   const strip = (n: string) => n.replace(/^(phong|room|dept|department|khu)/, '').replace(/(room|dept|department)$/, '');
   const inDept = dept
     ? areaLabels.filter((l) => {
-        const n = normalizeLabel(l);
-        return wanted.has(n) || wanted.has(strip(n));
+        return labelForms(l).some((n) => wanted.has(n) || wanted.has(strip(n)));
       })
     : [];
   return [own, mapped, inDept].filter((tier) => tier.length > 0);
@@ -203,7 +213,7 @@ const VENUE_ALIASES: Record<Venue, string[]> = {
 /** Area labels of a venue in this layout. */
 export function venueAreas(venue: Venue, areaLabels: string[]): string[] {
   const wanted = new Set(VENUE_ALIASES[venue].map(normalizeLabel));
-  return areaLabels.filter((l) => wanted.has(normalizeLabel(l)));
+  return areaLabels.filter((l) => labelForms(l).some((n) => wanted.has(n)));
 }
 
 /** Departments of a studio's leadership (tier 1). */
@@ -260,7 +270,7 @@ export function directorAreas(areaLabels: string[]): string[] {
   const wanted = new Set(
     DEPARTMENTS.filter((d) => LEADERSHIP.includes(d.id)).flatMap((d) => d.aliases.map(normalizeLabel)),
   );
-  return areaLabels.filter((l) => wanted.has(normalizeLabel(l)));
+  return areaLabels.filter((l) => labelForms(l).some((n) => wanted.has(n)));
 }
 
 /**

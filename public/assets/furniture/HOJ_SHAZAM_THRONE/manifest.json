@@ -1,0 +1,13 @@
+{
+  "id": "HOJ_SHAZAM_THRONE",
+  "name": "Throne of the Rock of Eternity",
+  "category": "decor",
+  "type": "asset",
+  "canPlaceOnWalls": false,
+  "canPlaceOnSurfaces": false,
+  "backgroundTiles": 2,
+  "width": 32,
+  "height": 48,
+  "footprintW": 2,
+  "footprintH": 3
+}

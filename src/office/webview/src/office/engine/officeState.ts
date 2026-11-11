@@ -36,7 +36,7 @@ import {
   venueAreas,
 } from './departments.js';
 import { getPetCount, getPetName } from '../sprites/petSpriteData.js';
-import { getLoadedCharacterCount } from '../sprites/spriteData.js';
+import { characterIndexOf, getLoadedCharacterCount } from '../sprites/spriteData.js';
 import type {
   Character,
   FurnitureInstance,
@@ -953,8 +953,10 @@ export class OfficeState {
 
     const id = this.nextSubagentId--;
     const parentCh = this.characters.get(parentAgentId);
-    const palette = parentCh ? parentCh.palette : 0;
-    const hueShift = parentCh ? parentCh.hueShift : 0;
+    // PrimeOffice: a parent wearing an avatar hands down its crew look, not the hero.
+    const look = parentCh ? (parentCh.crewPalette ?? { palette: parentCh.palette, hueShift: parentCh.hueShift }) : null;
+    const palette = look ? look.palette : 0;
+    const hueShift = look ? look.hueShift : 0;
 
     // Find the closest walkable tile to the parent, avoiding tiles occupied by other characters
     const parentCol = parentCh ? parentCh.tileCol : 0;
@@ -1430,6 +1432,25 @@ export class OfficeState {
    *  restoring. Sub-agents are excluded because they are derived state the
    *  runtime re-materializes, and the greeter never reaches here at all —
    *  it is not in `characters`. */
+  /**
+   * PrimeOffice: wear the avatar loaded from `key` (Add agent → Avatar), or go back to the crew
+   * palette with none. Its sub-agents keep the crew look of their parent.
+   */
+  setAgentAvatar(id: number, key: string | undefined): void {
+    const ch = this.characters.get(id);
+    if (!ch) return;
+    const index = key ? characterIndexOf(key) : -1;
+    if (index >= 0) {
+      if (!ch.crewPalette) ch.crewPalette = { palette: ch.palette, hueShift: ch.hueShift };
+      ch.palette = index;
+      ch.hueShift = 0;
+    } else if (ch.crewPalette) {
+      ch.palette = ch.crewPalette.palette;
+      ch.hueShift = ch.crewPalette.hueShift;
+      ch.crewPalette = undefined;
+    }
+  }
+
   getPersistableSeats(): Record<
     number,
     { palette: number; hueShift: number; seatId: string | null }
@@ -1439,7 +1460,8 @@ export class OfficeState {
       if (ch.isSubagent) continue;
       // PrimeOffice: while visiting, the seat to remember is the home seat.
       const seatId = ch.visit ? (ch.homeSeatId ?? null) : ch.seatId;
-      seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId };
+      const crew = ch.crewPalette ?? { palette: ch.palette, hueShift: ch.hueShift };
+      seats[ch.id] = { palette: crew.palette, hueShift: crew.hueShift, seatId };
     }
     return seats;
   }

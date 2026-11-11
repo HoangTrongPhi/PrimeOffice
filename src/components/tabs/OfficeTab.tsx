@@ -1,10 +1,10 @@
 import { Modal, PillBadge } from "@abyss/ui";
-import { Building2, FolderOpen, LayoutGrid, PanelRightClose, PanelRightOpen, Plus, Settings2, Trash2, Users } from "lucide-react";
+import { Building2, FolderOpen, LayoutGrid, PanelRightClose, PanelRightOpen, Plus, Settings2, Sparkles, Trash2, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { handleHelpKey } from "../../hooks/useGlobalHotkeys";
 import { pickPaths } from "../../lib/dialogs";
 import { inTauri } from "../../lib/ipc";
-import { kindOf, planFileOf, projectBlocker, STUDIO_KINDS, studioHasProject } from "../../lib/studios";
+import { kindOf, planFileOf, projectBlocker, STUDIO_KINDS, studioHasProject, themeOf } from "../../lib/studios";
 import { errorText, uiLog } from "../../stores/appStore";
 import { connectOfficeFrame } from "../../office/bridge/officeBridge";
 import { useOfficeStore, useProjectStore, useStudioStore } from "../../stores/dataStore";
@@ -15,6 +15,7 @@ import { AgentPanel, TermPanel } from "../office/AgentPanel";
 import { AgentStrip } from "../office/AgentStrip";
 import { CommandCenter } from "../office/CommandCenter";
 import { loadFloorPlan, ThemeStudio } from "../office/ThemeStudio";
+import { ThemeFx } from "../office/ThemeFx";
 import { folderName } from "../session/SessionView";
 
 const WINDOWS = [15, 30, 60, 240, 1440];
@@ -86,11 +87,12 @@ function Splitter() {
  */
 export function OfficeTab() {
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const labelsRef = useRef<Record<number, unknown> | null>(null);
   const { project, windowMinutes, pack, agents, selectedId, setProject, setWindowMinutes, setPack, select, refreshAgents, applyFilter } = useOfficeStore();
   const projects = useProjectStore((s) => s.projects);
   const { studios, active, loaded } = useStudioStore();
   const [frameKey, setFrameKey] = useState(0);
-  const { sidebarOpen, sidebarWidth, term, setSidebarOpen } = useOfficeUi();
+  const { sidebarOpen, sidebarWidth, term, setSidebarOpen, studioThemes, fx, setFx } = useOfficeUi();
   const tabs = useTermStore((s) => s.tabs);
   const [floorOpen, setFloorOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -105,6 +107,8 @@ export function OfficeTab() {
   const studio = studios.find((s) => s.id === active) ?? studios[0] ?? null;
   const studioId = studio?.id ?? null;
   const planFile = studio ? planFileOf(studio.kind) : null;
+  // The theme on screen (Theme Studio's last load) and its effect over the floor.
+  const theme = studio ? themeOf(studio.kind, studioThemes[studio.id]) : null;
 
   useEffect(() => {
     void useProjectStore.getState().load();
@@ -144,21 +148,27 @@ export function OfficeTab() {
 
   // Labels, prompts and actions change every turn: keep the side list fresh.
   useEffect(() => {
-    const t = setInterval(() => void refreshAgents(), 2000);
+    const t = setInterval(() => {
+      void refreshAgents();
+      // Again on every tick: labels sent before the frame had its characters (a reload, a new
+      // studio) were dropped, and the agent list may not change to send them again.
+      if (labelsRef.current) frameRef.current?.contentWindow?.postMessage({ type: "agentLabels", labels: labelsRef.current }, "*");
+    }, 2000);
     return () => clearInterval(t);
   }, [refreshAgents]);
 
   // The office labels its characters with what the shell knows: the agent's name, its task, the Boss.
   // Sent on every refresh (the frame ignores ids it has no character for yet).
-  const { names, tasks, bosses } = useOfficeUi();
+  const { names, tasks, bosses, avatars } = useOfficeUi();
   useEffect(() => {
-    const labels: Record<number, { name: string; task: string; boss: boolean }> = {};
+    const labels: Record<number, { name: string; task: string; boss: boolean; avatar?: string }> = {};
     for (const { id, session } of agents) {
       const name = agentName(session, names, termOf(session, tabs));
-      labels[id] = { name, task: agentTask(session, tasks, name), boss: isBoss(session, bosses) };
+      labels[id] = { name, task: agentTask(session, tasks, name), boss: isBoss(session, bosses), avatar: avatars[session.sessionId] };
     }
+    labelsRef.current = labels;
     frameRef.current?.contentWindow?.postMessage({ type: "agentLabels", labels }, "*");
-  }, [agents, names, tasks, bosses, tabs, frameKey, studioId, pack]);
+  }, [agents, names, tasks, bosses, avatars, tabs, frameKey, studioId, pack]);
 
   const selected = agents.find((a) => a.id === selectedId) ?? null;
   // A terminal card turns into its agent's card once its session has a character.
@@ -182,6 +192,7 @@ export function OfficeTab() {
     if (!id) return;
     setAddOpen(false);
     const theme = kindOf(newKind).themes[newTheme];
+    if (theme) useOfficeUi.getState().setStudioTheme(id, theme.id);
     if (newTheme > 0 && theme) {
       await loadFloorPlan(theme.file, id).catch((e) => uiLog("error", `Cannot load the theme: ${errorText(e)}`));
       setFrameKey((k) => k + 1);
@@ -275,6 +286,11 @@ export function OfficeTab() {
         <button type="button" className="btn" disabled={!studio} onClick={() => setFloorOpen(true)} title="Theme Studio: change this studio's floor, add rooms from templates, keep rooms as templates">
           <LayoutGrid className="size-3.5" /> Theme Studio…
         </button>
+        {theme?.fx && (
+          <button type="button" className={fx ? "btn btn-primary" : "btn"} onClick={() => setFx(!fx)} title={`${theme.label} effects over the floor: ${fx ? "on" : "off"}`} aria-pressed={fx}>
+            <Sparkles className="size-3.5" /> Effects
+          </button>
+        )}
         <div className="flex-1" />
         <PillBadge tone={agents.length ? "accent" : "neutral"}>
           <Users className="size-3" /> {agents.length} agent{agents.length === 1 ? "" : "s"}
@@ -437,6 +453,7 @@ export function OfficeTab() {
         <div className="relative min-w-0 flex-1 bg-[#1e1e2e]">
           {/* Mounted once the studios are known, so the frame boots with the right floor. */}
           {(loaded || !inTauri) && <iframe key={`${pack}-${studioId}-${frameKey}`} ref={frameRef} src="office.html" title="Office" className="absolute inset-0 size-full border-0" />}
+          <ThemeFx kind={fx ? theme?.fx : null} />
         </div>
 
         {sidebarOpen && (

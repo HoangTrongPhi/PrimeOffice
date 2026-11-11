@@ -38,17 +38,28 @@ interface LoadedCharacterData {
 }
 
 let loadedCharacters: LoadedCharacterData[] | null = null;
+// PrimeOffice patch: the first `crewCount` sprites are the crew (picked for new agents); the rest are
+// avatars the shell assigns by key (file name), see characterIndexOf.
+let crewCount: number | null = null;
+let characterKeys: string[] = [];
+
+/** Index of the character loaded from `key` (a file relative to assets/characters), or -1. */
+export function characterIndexOf(key: string): number {
+  return characterKeys.indexOf(key);
+}
 
 /** Set pre-colored character sprites loaded from PNG assets. Call this when characterSpritesLoaded message arrives. */
-export function setCharacterTemplates(data: LoadedCharacterData[]): void {
+export function setCharacterTemplates(data: LoadedCharacterData[], crew?: number, keys?: string[]): void {
   loadedCharacters = data;
+  crewCount = crew && crew > 0 && crew <= data.length ? crew : null;
+  characterKeys = keys ?? [];
   // Clear cache so sprites are rebuilt from loaded data
   spriteCache.clear();
 }
 
 /** Return the number of loaded character palettes, or PALETTE_COUNT as fallback. */
 export function getLoadedCharacterCount(): number {
-  return loadedCharacters ? loadedCharacters.length : PALETTE_COUNT;
+  return loadedCharacters ? (crewCount ?? loadedCharacters.length) : PALETTE_COUNT;
 }
 
 /** Flip a SpriteData horizontally (for generating left sprites from right) */

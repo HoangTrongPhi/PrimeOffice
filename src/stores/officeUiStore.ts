@@ -26,6 +26,15 @@ interface OfficeUiState {
   tasks: Record<string, string>;
   /** The Boss of each project folder: folder (lower case) → session id. */
   bosses: Record<string, string>;
+  /** Avatars the user picked (Add agent → Avatar): session id → file relative to assets/characters. */
+  avatars: Record<string, string>;
+  /** Theme Studio theme loaded last per studio (its effects play over the floor): studio id → theme id. */
+  studioThemes: Record<string, string>;
+  /** Theme effects (snow, petals, code rain…) on or off. */
+  fx: boolean;
+  setAvatar: (sessionId: string, file: string | null) => void;
+  setStudioTheme: (studioId: string, themeId: string) => void;
+  setFx: (on: boolean) => void;
   addOpen: boolean;
   setTask: (sessionId: string, task: string) => void;
   /** Make a session the Boss of a folder (null: the folder has no Boss). */
@@ -49,6 +58,18 @@ export const useOfficeUi = create<OfficeUiState>()(
       names: {},
       tasks: {},
       bosses: {},
+      avatars: {},
+      studioThemes: {},
+      fx: true,
+      setAvatar: (sessionId, file) =>
+        set((s) => {
+          const avatars = { ...s.avatars };
+          if (file) avatars[sessionId] = file;
+          else delete avatars[sessionId];
+          return { avatars };
+        }),
+      setStudioTheme: (studioId, themeId) => set((s) => ({ studioThemes: { ...s.studioThemes, [studioId]: themeId } })),
+      setFx: (fx) => set({ fx }),
       addOpen: false,
       setTask: (sessionId, task) =>
         set((s) => {
@@ -79,7 +100,7 @@ export const useOfficeUi = create<OfficeUiState>()(
         }),
       setAddOpen: (addOpen) => set({ addOpen }),
     }),
-    { name: "primeoffice.office-ui", partialize: (s) => ({ sidebarOpen: s.sidebarOpen, sidebarWidth: s.sidebarWidth, agentTab: s.agentTab, commandTab: s.commandTab, names: s.names, tasks: s.tasks, bosses: s.bosses }) },
+    { name: "primeoffice.office-ui", partialize: (s) => ({ sidebarOpen: s.sidebarOpen, sidebarWidth: s.sidebarWidth, agentTab: s.agentTab, commandTab: s.commandTab, names: s.names, tasks: s.tasks, bosses: s.bosses, avatars: s.avatars, studioThemes: s.studioThemes, fx: s.fx }) },
   ),
 );
 

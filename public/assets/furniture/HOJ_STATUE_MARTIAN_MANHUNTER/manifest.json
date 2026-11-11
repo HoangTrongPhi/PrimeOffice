@@ -1,0 +1,13 @@
+{
+  "id": "HOJ_STATUE_MARTIAN_MANHUNTER",
+  "name": "Statue — Martian Manhunter",
+  "category": "decor",
+  "type": "asset",
+  "canPlaceOnWalls": false,
+  "canPlaceOnSurfaces": false,
+  "backgroundTiles": 4,
+  "width": 32,
+  "height": 80,
+  "footprintW": 2,
+  "footprintH": 5
+}

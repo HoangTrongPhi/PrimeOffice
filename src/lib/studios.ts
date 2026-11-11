@@ -12,7 +12,13 @@ export interface StudioTheme {
   /** Floor plan under public/assets. */
   file: string;
   text: string;
+  /** Theme Studio heading the theme is listed under (Standard when absent). */
+  group?: string;
+  /** Effect played over the floor while the theme is on (src/components/office/ThemeFx.tsx). */
+  fx?: ThemeFxKind;
 }
+
+export type ThemeFxKind = "snow" | "spooky" | "petals" | "neon" | "code" | "bubbles" | "justice" | "cave";
 
 export interface StudioKind {
   id: string;
@@ -21,6 +27,22 @@ export interface StudioKind {
   /** Floor plans to choose from in Theme Studio; the first one is what a new studio starts with. */
   themes: StudioTheme[];
 }
+
+/**
+ * Special themes of the Game studio: Campus or Open Floor room for room (same departments, seats, Pantry,
+ * Ban giám đốc), dressed for an occasion or a style, with an effect over the floor.
+ * Drawn by scripts/gen-studio-layout.py (SPECIAL) with scripts/gen-theme-furniture.py.
+ */
+const SPECIAL_THEMES: StudioTheme[] = [
+  { id: "christmas", group: "Lễ hội", label: "Christmas", file: "layouts/game-christmas.json", fx: "snow", text: "Campus in snow: Christmas trees, gifts, a snowman, wreaths and string lights. Snow falls over the floor." },
+  { id: "halloween", group: "Lễ hội", label: "Halloween", file: "layouts/game-halloween.json", fx: "spooky", text: "Campus at night: jack-o'-lanterns, a cauldron, gravestones, cobwebs. Bats and fog drift by." },
+  { id: "tet", group: "Lễ hội", label: "Tết", file: "layouts/game-tet.json", fx: "petals", text: "Open Floor in red and gold: hoa đào, cây quất, bánh chưng, câu đối and lanterns. Peach petals fall, fireworks now and then." },
+  { id: "cyberpunk", group: "Phong cách", label: "Cyberpunk", file: "layouts/game-cyberpunk.json", fx: "neon", text: "Open Floor in neon: holo terminals, neon palms, data pillars and signs. Neon rain and a flicker." },
+  { id: "matrix", group: "Phong cách", label: "Matrix", file: "layouts/game-matrix.json", fx: "code", text: "Campus in the dark green of a terminal: CRT stacks, old phones, code screens. Code rain over the floor." },
+  { id: "aquarium", group: "Phong cách", label: "Aquarium", file: "layouts/game-aquarium.json", fx: "bubbles", text: "Open Floor under the sea: fish tanks, coral, seaweed, a treasure chest, portholes. Bubbles and light ripples." },
+  { id: "hall-of-justice", group: "DC", label: "Hall of Justice", file: "layouts/dc-hall-of-justice.json", fx: "justice", text: "A map of its own, after the Super Friends' hall and the comics: the Great Hall with the founders in marble around their fountain, the Round Table under the alert monitor, the Teleporter Bay, and a wing per legacy — Themyscira (lasso, shield), Cyborg's Lab (Mother Box), the Speed Lab (cosmic treadmill, winged helmet), the Rock of Eternity, Atlantis (trident), the Lantern Corps (power battery), the Hall of Heroes, the Trophy Room with Starro. Light glints in the halls." },
+  { id: "batcave", group: "DC", label: "BatCave", file: "layouts/dc-batcave.json", fx: "cave", text: "A map of its own, after the films, the comics and the animated series: the cave computer with its giant screen over Gotham and the feeds beside it, the Armory of suit tubes (Batman, Robin, Nightwing, Batgirl, Batwoman, Red Hood, Jason's memorial suit, the heavy armour), the Trophy Hall (T-rex, penny, Joker card, Alfred's tea), the garage (car on its turntable, armoured car, cycle, jet), the rooms of Nightwing, Robin and Oracle, the Forensics Lab, Case Files, Comms, the Training Ground and the waterfall. Bats and drips." },
+];
 
 export const STUDIO_KINDS: StudioKind[] = [
   {
@@ -40,6 +62,7 @@ export const STUDIO_KINDS: StudioKind[] = [
         file: "layouts/game-open.json",
         text: "An executive wing with walls (Ban giám đốc, Phòng họp, Studio head, Loc & community) beside one open floor where departments are areas without walls; Pantry in the middle.",
       },
+      ...SPECIAL_THEMES,
     ],
   },
   {
@@ -91,4 +114,10 @@ export function projectBlocker(path: string, hasClaude: boolean, studios: Studio
   if (!hasClaude) return "no .claude folder";
   const owner = studios.find((s) => s.id !== except && s.projects.some((p) => samePath(p, path)));
   return owner ? `already the project of ${owner.name}` : null;
+}
+
+/** The theme a studio has on (Theme Studio's last load), else its kind's first theme. */
+export function themeOf(kind: string, themeId: string | undefined): StudioTheme {
+  const k = kindOf(kind);
+  return k.themes.find((t) => t.id === themeId) ?? k.themes[0];
 }

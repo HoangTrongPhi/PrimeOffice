@@ -318,13 +318,14 @@ export function useExtensionMessages(
       if (msg.type === 'agentLabels') {
         const labels = (msg.labels || {}) as Record<
           string,
-          { name?: string; task?: string; boss?: boolean }
+          { name?: string; task?: string; boss?: boolean; avatar?: string }
         >;
         for (const [id, label] of Object.entries(labels)) {
           const ch = os.characters.get(Number(id));
           if (!ch || ch.isSubagent) continue;
           ch.agentName = label.name || undefined;
           ch.taskName = label.task || undefined;
+          os.setAgentAvatar(Number(id), label.avatar);
           // The Boss is the folder's director: it moves to the directors' room.
           os.setAgentBoss(Number(id), label.boss === true);
         }
@@ -720,7 +721,7 @@ export function useExtensionMessages(
           right: string[][][];
         }>;
         console.log(`[Webview] Received ${characters.length} pre-colored character sprites`);
-        setCharacterTemplates(characters);
+        setCharacterTemplates(characters, msg.crewCount as number | undefined, msg.characterKeys as string[] | undefined);
       } else if (msg.type === 'petSpritesLoaded') {
         const pets = msg.pets;
         if (!Array.isArray(pets)) {

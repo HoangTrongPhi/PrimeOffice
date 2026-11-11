@@ -1,0 +1,326 @@
+{
+ "version": 1,
+ "groups": [
+  {
+   "id": "dc",
+   "label": "DC",
+   "items": [
+    {
+     "id": "batman",
+     "name": "Batman",
+     "file": "themes/dc/batman.png"
+    },
+    {
+     "id": "superman",
+     "name": "Superman",
+     "file": "themes/dc/superman.png"
+    },
+    {
+     "id": "wonder-woman",
+     "name": "Wonder Woman",
+     "file": "themes/dc/wonder-woman.png"
+    },
+    {
+     "id": "flash",
+     "name": "The Flash",
+     "file": "themes/dc/flash.png"
+    },
+    {
+     "id": "aquaman",
+     "name": "Aquaman",
+     "file": "themes/dc/aquaman.png"
+    },
+    {
+     "id": "green-lantern",
+     "name": "Green Lantern",
+     "file": "themes/dc/green-lantern.png"
+    },
+    {
+     "id": "cyborg",
+     "name": "Cyborg",
+     "file": "themes/dc/cyborg.png"
+    },
+    {
+     "id": "robin",
+     "name": "Robin",
+     "file": "themes/dc/robin.png"
+    },
+    {
+     "id": "nightwing",
+     "name": "Nightwing",
+     "file": "themes/dc/nightwing.png"
+    },
+    {
+     "id": "batgirl",
+     "name": "Batgirl",
+     "file": "themes/dc/batgirl.png"
+    },
+    {
+     "id": "batwoman",
+     "name": "Batwoman",
+     "file": "themes/dc/batwoman.png"
+    },
+    {
+     "id": "red-hood",
+     "name": "Red Hood",
+     "file": "themes/dc/red-hood.png"
+    },
+    {
+     "id": "martian-manhunter",
+     "name": "Martian Manhunter",
+     "file": "themes/dc/martian-manhunter.png"
+    },
+    {
+     "id": "shazam",
+     "name": "Shazam",
+     "file": "themes/dc/shazam.png"
+    },
+    {
+     "id": "green-arrow",
+     "name": "Green Arrow",
+     "file": "themes/dc/green-arrow.png"
+    },
+    {
+     "id": "hawkman",
+     "name": "Hawkman",
+     "file": "themes/dc/hawkman.png"
+    },
+    {
+     "id": "joker",
+     "name": "Joker",
+     "file": "themes/dc/joker.png"
+    }
+   ]
+  },
+  {
+   "id": "marvel",
+   "label": "Marvel",
+   "items": [
+    {
+     "id": "iron-man",
+     "name": "Iron Man",
+     "file": "themes/marvel/iron-man.png"
+    },
+    {
+     "id": "captain-america",
+     "name": "Captain America",
+     "file": "themes/marvel/captain-america.png"
+    },
+    {
+     "id": "spider-man",
+     "name": "Spider-Man",
+     "file": "themes/marvel/spider-man.png"
+    },
+    {
+     "id": "thor",
+     "name": "Thor",
+     "file": "themes/marvel/thor.png"
+    },
+    {
+     "id": "hulk",
+     "name": "Hulk",
+     "file": "themes/marvel/hulk.png"
+    },
+    {
+     "id": "black-widow",
+     "name": "Black Widow",
+     "file": "themes/marvel/black-widow.png"
+    },
+    {
+     "id": "black-panther",
+     "name": "Black Panther",
+     "file": "themes/marvel/black-panther.png"
+    },
+    {
+     "id": "doctor-strange",
+     "name": "Doctor Strange",
+     "file": "themes/marvel/doctor-strange.png"
+    }
+   ]
+  },
+  {
+   "id": "dragonball",
+   "label": "Dragon Ball",
+   "items": [
+    {
+     "id": "goku",
+     "name": "Goku",
+     "file": "themes/dragonball/goku.png"
+    },
+    {
+     "id": "goku-ssj",
+     "name": "Goku SSJ",
+     "file": "themes/dragonball/goku-ssj.png"
+    },
+    {
+     "id": "vegeta",
+     "name": "Vegeta",
+     "file": "themes/dragonball/vegeta.png"
+    },
+    {
+     "id": "gohan",
+     "name": "Gohan",
+     "file": "themes/dragonball/gohan.png"
+    },
+    {
+     "id": "piccolo",
+     "name": "Piccolo",
+     "file": "themes/dragonball/piccolo.png"
+    },
+    {
+     "id": "krillin",
+     "name": "Krillin",
+     "file": "themes/dragonball/krillin.png"
+    },
+    {
+     "id": "bulma",
+     "name": "Bulma",
+     "file": "themes/dragonball/bulma.png"
+    },
+    {
+     "id": "trunks",
+     "name": "Trunks",
+     "file": "themes/dragonball/trunks.png"
+    }
+   ]
+  },
+  {
+   "id": "naruto",
+   "label": "Naruto",
+   "items": [
+    {
+     "id": "naruto",
+     "name": "Naruto",
+     "file": "themes/naruto/naruto.png"
+    },
+    {
+     "id": "sasuke",
+     "name": "Sasuke",
+     "file": "themes/naruto/sasuke.png"
+    },
+    {
+     "id": "sakura",
+     "name": "Sakura",
+     "file": "themes/naruto/sakura.png"
+    },
+    {
+     "id": "kakashi",
+     "name": "Kakashi",
+     "file": "themes/naruto/kakashi.png"
+    },
+    {
+     "id": "itachi",
+     "name": "Itachi",
+     "file": "themes/naruto/itachi.png"
+    },
+    {
+     "id": "hinata",
+     "name": "Hinata",
+     "file": "themes/naruto/hinata.png"
+    },
+    {
+     "id": "gaara",
+     "name": "Gaara",
+     "file": "themes/naruto/gaara.png"
+    },
+    {
+     "id": "jiraiya",
+     "name": "Jiraiya",
+     "file": "themes/naruto/jiraiya.png"
+    }
+   ]
+  },
+  {
+   "id": "festive",
+   "label": "Lễ hội",
+   "items": [
+    {
+     "id": "santa",
+     "name": "Santa",
+     "file": "themes/festive/santa.png"
+    },
+    {
+     "id": "elf",
+     "name": "Elf",
+     "file": "themes/festive/elf.png"
+    },
+    {
+     "id": "witch",
+     "name": "Witch",
+     "file": "themes/festive/witch.png"
+    },
+    {
+     "id": "vampire",
+     "name": "Vampire",
+     "file": "themes/festive/vampire.png"
+    },
+    {
+     "id": "pumpkin",
+     "name": "Pumpkin Jack",
+     "file": "themes/festive/pumpkin.png"
+    },
+    {
+     "id": "skeleton",
+     "name": "Skeleton",
+     "file": "themes/festive/skeleton.png"
+    },
+    {
+     "id": "ong-do",
+     "name": "Ông Đồ",
+     "file": "themes/festive/ong-do.png"
+    },
+    {
+     "id": "ao-dai",
+     "name": "Áo dài",
+     "file": "themes/festive/ao-dai.png"
+    }
+   ]
+  },
+  {
+   "id": "scifi",
+   "label": "Cyber & Sea",
+   "items": [
+    {
+     "id": "netrunner",
+     "name": "Netrunner",
+     "file": "themes/scifi/netrunner.png"
+    },
+    {
+     "id": "cyber-samurai",
+     "name": "Cyber Samurai",
+     "file": "themes/scifi/cyber-samurai.png"
+    },
+    {
+     "id": "operator",
+     "name": "Operator",
+     "file": "themes/scifi/operator.png"
+    },
+    {
+     "id": "agent",
+     "name": "Agent",
+     "file": "themes/scifi/agent.png"
+    },
+    {
+     "id": "diver",
+     "name": "Diver",
+     "file": "themes/scifi/diver.png"
+    },
+    {
+     "id": "marine",
+     "name": "Marine biologist",
+     "file": "themes/scifi/marine.png"
+    },
+    {
+     "id": "mermaid",
+     "name": "Mermaid",
+     "file": "themes/scifi/mermaid.png"
+    },
+    {
+     "id": "robot",
+     "name": "Robot",
+     "file": "themes/scifi/robot.png"
+    }
+   ]
+  }
+ ]
+}

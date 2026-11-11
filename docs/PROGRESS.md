@@ -1,20 +1,9 @@
 # PrimeOffice — Progress
 
 ## Status
-<<<<<<< Updated upstream
-- Current phase: 0.4.0 (Office control room, Terminal tab, Chat whole conversation) — version set and pushed
-  2026-11-11 (`b355f16`); the user publishes it with the GitHub Actions workflow **Release** (needs the
-  `TAURI_SIGNING_PRIVATE_KEY` secret; the key is not on this PC and `gh` is not installed). 0.3.0 was released
-  2026-11-11. The user commits, pushes and publishes GitHub releases themself
-=======
-- 2026-11-11 (evening): **0.5.0 built** on the user's request (Theme Studio, room templates, one project per
-  studio, Pantry, briefings, Boss and team briefing) — signed files in `release/0.5.0` (installer 4.15 MB,
-  SHA256SUMS checked). Not committed, not pushed, not published. origin/main is 1 commit ahead (a PROGRESS.md edit
-  by the user): pull before committing; PROGRESS.md may need a merge.
-- Current phase: 0.3.0 built 2026-11-11 on the user's request (Chat, Studios + Video studio, Codex sessions); files
-  in `release/0.3.0`; not published. 0.2.0 was released 2026-11-10. The user commits, pushes and publishes GitHub
-  releases themself
->>>>>>> Stashed changes
+- Current phase: **0.6.0** released 2026-11-11 on the user's request (avatars by theme, special themes with
+  effects, DC BatCave and Hall of Justice with their own maps and art) — signed files in `release/0.6.0`,
+  committed, pushed and published by Claude (the user asked for it this time). 0.5.0 was released 2026-11-11.
 - Last session: 2026-11-09 — app built from the template: Rust observer + providers + project check + CLI,
   vendored pixel-agents office in an iframe, Projects / History / Agents modules, generated character crew
 - `npm run check`: green 2026-11-11 (66 Rust tests, 11 TS tests, typecheck, 30/30 commands mocked); `npm run build` green
@@ -164,6 +153,43 @@
   work. Video studio keeps its Lounge (user: unchanged). Assets are added at build time
   (`public/assets/furniture/<ID>/` + `npm run assets`); runtime asset folders are not supported.
 - [ ] P7 Optional Claude hooks via `primeoffice.exe hook` (exact permission bubbles)
+
+- [x] 2026-11-11 (night) **Avatars + special themes** (user's request: avatar templates by theme — all project
+  characters first, then DC, Marvel, Dragon Ball, Naruto…; special layout themes as complete as Campus / Open Floor
+  — Christmas, Halloween, Tết, Cyberpunk, Matrix, Aquarium — with simple effects; DC: Hall of Justice and BatCave).
+  - Art (all generated, nothing downloaded): `scripts/gen-avatars.py` → 48 avatars in 6 groups
+    (`characters/themes/`, `themes.json`); `scripts/gen-theme-furniture.py` → 40 pieces; `gen-studio-layout.py`
+    `SPECIAL` → 8 plans (`game-christmas|halloween|tet|cyberpunk|matrix|aquarium.json`, `dc-hall-of-justice.json`,
+    `dc-batcave.json`), Campus or Open Floor room for room (same areas and seat counts; pieces placed only where
+    everything stays reachable). `build-office-assets.mjs` → `avatarGroups` (crew packs first). Old plans unchanged.
+  - App: `AvatarPicker.tsx` (Add agent → Identity; avatar button on the agent card), `officeUiStore` `avatars`
+    (session → file), `studioThemes` (studio → theme id), `fx`; `studios.ts` theme `group` / `fx`, `themeOf`;
+    `ThemeStudio.tsx` groups (Standard / Lễ hội / Phong cách / DC) and marks the theme on; `ThemeFx.tsx` canvas
+    effects (snow, spooky, petals, neon, code, bubbles, justice, cave), **Effects** toggle in the Office bar;
+    `OfficeTab` resends labels every 2 s (fix). Engine patches in UPSTREAM_PATCHES (avatar by file, crew first).
+  - Checked: `npm run check` green (21 TS tests incl. new `themes.test.ts`, 67 Rust, 30/30 mocked), `npm run
+    build` green; `?mock`: Add agent avatar tabs, Batman picked fills the name, agent card → Goku SSJ shows in the
+    office, BatCave and Christmas load, snow falls, no console errors.
+  - **Open:** not tried in the real window. DC / Marvel / Dragon Ball / Naruto avatars and the DC pieces are fan
+    art of trademarked characters; the user decided to ship them (personal, non-commercial project, docs/ASSETS.md). The mock makes new session ids on each reload, so avatars set in the mock do not survive a
+    reload there (real sessions keep their ids). Help (F1) → Theme Studio topic covers both.
+
+- [x] 2026-11-11 (late) **DC maps rebuilt as one-of-a-kind** (user: BatCave and Hall of Justice must look as close
+  as possible to the films / comics / animated series, with their own assets instead of re-dressed office pieces;
+  BatCave: one biggest screen + feeds where Batman watches Gotham, suit tubes of the sidekicks too, a proper
+  Batmobile garage, rooms like Robin's, Nightwing's, the Lab; Hall of Justice: heroes' legacy pieces — Aquaman,
+  Cyborg, Flash, Wonder Woman, Green Lantern, Shazam …). The user checks quality before the 0.6.0 build.
+  - `scripts/gen-dc-furniture.py`: 98 pieces (`BC_*`, `HOJ_*`: own desks / chairs / monitors as each plan's `kit`,
+    10×5 main screen + 3 feed screens, 8 suit tubes, 4 vehicles, statues 2×5 of 11 heroes, banners, relics) + 4
+    floors (`floor_9..12`, tile values 10–13). The old DC pieces left `gen-theme-furniture.py` (folders deleted).
+  - `gen-studio-layout.py`: `batcave()` 54×58, 15 rooms; `hall_of_justice()` 54×49, 13 rooms; `Plan.kit`; same
+    seat minimums as Campus (`CAMPUS_NEED`), reachability checked; BatCave rocks / stalagmites via `scatter`.
+  - Engine: `departments.ts` `labelForms` (rooms "<room> · <department>"); tests in departments / themes tests
+    (themes: DC maps cover every Campus department, use only their own furniture).
+  - `gen-avatars.py`: + Robin, Nightwing, Batgirl, Batwoman, Red Hood, Martian Manhunter, Shazam, Green Arrow, Hawkman.
+  - Checked: `npm run check` green (23 TS tests, 67 Rust, 30/30 mocked), `npm run build` green; `?mock` BatCave loads
+    with the new floors, suit tubes, trophies and themed labels; no console errors. **Open:** the real window; the
+    user's quality pass; then the 0.6.0 build (version not bumped yet).
 
 ## Decisions (answers to the spec's open questions)
 - 2026-11-09 — Backend: native Rust, no Node sidecar; observe transcripts only, no hooks in 0.1 (user)

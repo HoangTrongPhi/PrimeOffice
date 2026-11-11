@@ -11,10 +11,11 @@ import { agentName, folderKey, selectTerm, useOfficeUi } from "../../stores/offi
 import { useTermStore } from "../../stores/termStore";
 import type { AgentSession } from "../../types/primeoffice";
 import { folderName, relTime } from "../session/SessionView";
+import { AvatarPicker } from "./AvatarPicker";
 
 type Section = "identity" | "workspace" | "engine" | "briefing";
 const SECTIONS: { id: Section; label: string; hint: string; icon: LucideIcon }[] = [
-  { id: "identity", label: "Identity", hint: "name", icon: IdCard },
+  { id: "identity", label: "Identity", hint: "name · avatar", icon: IdCard },
   { id: "workspace", label: "Workspace", hint: "folder · resume", icon: FolderOpen },
   { id: "engine", label: "Engine", hint: "CLI · model · permissions", icon: Cpu },
   { id: "briefing", label: "Briefing", hint: "role · task", icon: Briefcase },
@@ -55,6 +56,7 @@ export function AddAgentModal() {
   const folders = projects.filter((p) => studioHasProject(currentStudio(), p.path));
   const [section, setSection] = useState<Section>("identity");
   const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState("");
   const [cwd, setCwd] = useState("");
   const [preset, setPreset] = useState("claude");
   const [model, setModel] = useState("");
@@ -82,6 +84,7 @@ export function AddAgentModal() {
     void useTermStore.getState().loadPresets();
     setSection("identity");
     setName("");
+    setAvatar("");
     setResume("");
     setTask("");
     setTaskName("");
@@ -152,6 +155,7 @@ export function AddAgentModal() {
     if (sessionId) {
       const ui = useOfficeUi.getState();
       if (name.trim()) ui.setName(sessionId, name);
+      if (avatar) ui.setAvatar(sessionId, avatar);
       if (taskName.trim()) ui.setTask(sessionId, taskName);
       if (briefing.role === "boss") ui.setBoss(cwd, sessionId);
     }
@@ -210,9 +214,22 @@ export function AddAgentModal() {
 
         <div className="flex min-w-0 flex-1 flex-col gap-4 border-l border-edge pl-4">
           {section === "identity" && (
-            <Row label="Name" hint="Shown on its card, in the Command Center and on its terminal tab. Empty: the session's own title, else the CLI and folder.">
-              <input className={FIELD} value={name} maxLength={40} placeholder="e.g. Ada, Build fixer" autoFocus onChange={(e) => setName(e.target.value)} />
-            </Row>
+            <>
+              <Row label="Name" hint="Shown on its card, in the Command Center and on its terminal tab. Empty: the session's own title, else the CLI and folder.">
+                <input className={FIELD} value={name} maxLength={40} placeholder="e.g. Ada, Build fixer" autoFocus onChange={(e) => setName(e.target.value)} />
+              </Row>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[12px] font-medium text-ink">Avatar</span>
+                <AvatarPicker
+                  value={avatar}
+                  onChange={(file, label) => {
+                    setAvatar(file);
+                    if (!name.trim() && label && file.startsWith("themes/")) setName(label);
+                  }}
+                />
+                <span className="text-[11px] leading-relaxed text-ink-faint">How it looks in the office. Change it later from the agent's card. Its sub-agents keep the crew look.</span>
+              </div>
+            </>
           )}
 
           {section === "workspace" && (

@@ -1,0 +1,13 @@
+{
+  "id": "BC_SIDE_SCREEN_A",
+  "name": "Cave Computer — Feeds (Asylum, Joker)",
+  "category": "decor",
+  "type": "asset",
+  "canPlaceOnWalls": false,
+  "canPlaceOnSurfaces": false,
+  "backgroundTiles": 3,
+  "width": 32,
+  "height": 64,
+  "footprintW": 2,
+  "footprintH": 4
+}

@@ -132,15 +132,39 @@ for (const f of existsSync(assets) ? readdirSync(assets) : []) {
 }
 
 const packs = characterPacks();
+
+/**
+ * Avatar groups for Add agent → Avatar: every crew pack first (all characters of the project), then the
+ * themed groups of characters/themes/themes.json (scripts/gen-avatars.py). `file` is relative to characters/.
+ */
+function avatarGroups() {
+  const crewLabels = { classic: "Classic crew", pixel: "PrimeOffice crew" };
+  const groups = Object.entries(packs).map(([id, files]) => ({
+    id: `crew-${id}`,
+    label: crewLabels[id] ?? `Crew: ${id}`,
+    crew: true,
+    items: files.map((file, i) => ({ id: `${id}-${i}`, name: `${crewLabels[id] ?? id} ${i + 1}`, file })),
+  }));
+  const themes = join(assets, "characters", "themes", "themes.json");
+  if (existsSync(themes)) {
+    for (const g of JSON.parse(readFileSync(themes, "utf-8")).groups ?? []) {
+      const items = (g.items ?? []).filter((it) => existsSync(join(assets, "characters", it.file)));
+      if (items.length) groups.push({ id: g.id, label: g.label, items });
+    }
+  }
+  return groups;
+}
+
 const index = {
   floors: listSorted("floors", /^floor_\d+\.png$/i),
   walls: listSorted("walls", /^wall_\d+\.png$/i),
   carpets: listSorted("carpets", /^carpet_\d+\.png$/i),
   characters: packs.classic ?? [],
   characterPacks: packs,
+  avatarGroups: avatarGroups(),
   defaultLayout,
 };
 const catalog = furnitureCatalog();
 writeFileSync(join(assets, "asset-index.json"), JSON.stringify(index, null, 2) + "\n");
 writeFileSync(join(assets, "furniture-catalog.json"), JSON.stringify(catalog, null, 2) + "\n");
-console.log(`assets: ${index.floors.length} floors, ${index.walls.length} walls, ${index.carpets.length} carpets, packs ${Object.entries(packs).map(([k, v]) => `${k}(${v.length})`).join(" ")}, ${catalog.length} furniture`);
+console.log(`assets: ${index.avatarGroups.reduce((n, g) => n + g.items.length, 0)} avatars in ${index.avatarGroups.length} groups, ${index.floors.length} floors, ${index.walls.length} walls, ${index.carpets.length} carpets, packs ${Object.entries(packs).map(([k, v]) => `${k}(${v.length})`).join(" ")}, ${catalog.length} furniture`);

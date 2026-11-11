@@ -1,0 +1,13 @@
+{
+  "id": "HOJ_FOUNTAIN",
+  "name": "Founders' Fountain",
+  "category": "decor",
+  "type": "asset",
+  "canPlaceOnWalls": false,
+  "canPlaceOnSurfaces": false,
+  "backgroundTiles": 1,
+  "width": 64,
+  "height": 48,
+  "footprintW": 4,
+  "footprintH": 3
+}

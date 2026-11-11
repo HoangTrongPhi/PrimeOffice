@@ -1,4 +1,4 @@
-import { EmptyState } from "@abyss/ui";
+import { EmptyState, Modal } from "@abyss/ui";
 import { Activity, Check, Crown, EyeOff, FolderOpen, Loader2, MessagesSquare, Pencil, SquareTerminal, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { ChatItem } from "../../lib/chatEvents";
@@ -10,6 +10,7 @@ import { termName, useTermStore, type TermTab } from "../../stores/termStore";
 import type { OfficeAgent } from "../../types/primeoffice";
 import { ChatItemView } from "../tabs/ChatTab";
 import { folderName, SessionView, StatusPill } from "../session/SessionView";
+import { AvatarPicker, AvatarSprite } from "./AvatarPicker";
 import { TermComposer, TermView } from "./TermView";
 
 const PROVIDER: Record<string, string> = { claude: "Claude Code", codex: "Codex", gemini: "Gemini", shell: "Shell" };
@@ -125,7 +126,9 @@ function TermBody({ tab }: { tab: TermTab }) {
 export function AgentPanel({ agent }: { agent: OfficeAgent }) {
   const { session } = agent;
   const tabs = useTermStore((s) => s.tabs);
-  const { names, tasks, bosses, agentTab, setAgentTab, setName, setTask, setBoss } = useOfficeUi();
+  const { names, tasks, bosses, avatars, agentTab, setAgentTab, setName, setTask, setBoss, setAvatar } = useOfficeUi();
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const avatar = avatars[session.sessionId] ?? "";
   const boss = isBoss(session, bosses);
   const linked = termOf(session, tabs);
   const claude = session.provider === "claude";
@@ -151,7 +154,19 @@ export function AgentPanel({ agent }: { agent: OfficeAgent }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-col gap-2 border-b border-edge px-4 py-3">
+        <Modal open={avatarOpen} title={`Avatar — ${name}`} onClose={() => setAvatarOpen(false)} className="max-w-xl">
+          <AvatarPicker value={avatar} onChange={(file) => setAvatar(session.sessionId, file || null)} />
+        </Modal>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-edge bg-canvas/50 hover:border-accent"
+            title="Avatar: how this agent looks in the office"
+            aria-label="Change the avatar"
+            onClick={() => setAvatarOpen(true)}
+          >
+            {avatar ? <AvatarSprite file={avatar} scale={1} /> : <Pencil className="size-3 text-ink-faint" />}
+          </button>
           <EditableName name={name} onCommit={(n) => (linked && !names[session.sessionId] ? useTermStore.getState().rename(linked.key, n) : setName(session.sessionId, n))} />
           <StatusPill status={session.status} />
           <button type="button" className="icon-btn size-6 shrink-0" title="Back to the Command Center" aria-label="Close" onClick={() => selectAgent(null)}>

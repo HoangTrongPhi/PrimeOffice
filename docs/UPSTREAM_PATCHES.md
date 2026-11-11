@@ -24,3 +24,9 @@ diff small; re-apply after every update.
 | `webview/src/office/types.ts` | 2026-11-11: `Character.briefUntil?` | Same |
 | `webview/src/hooks/useExtensionMessages.ts` | 2026-11-11: `agentLabels` calls `os.setAgentBoss` instead of setting `isBoss` | Same |
 | `webview/src/office/components/ToolOverlay.tsx` | Name line: `BOSS · <name>` in the lead colour when `isBoss`; third line: `taskName`, else `directoryName` | Same |
+| `core/src/messages.ts` | 2026-11-11: `characterSpritesLoaded` + `crewCount?`, `characterKeys?` | Avatars: the crew comes first, every avatar after it, by file |
+| `webview/src/office/sprites/spriteData.ts` | 2026-11-11: `setCharacterTemplates(data, crewCount, keys)`; `getLoadedCharacterCount` returns the crew size (new agents get a crew look); `characterIndexOf(key)` | Same |
+| `webview/src/hooks/useExtensionMessages.ts` | 2026-11-11: `characterSpritesLoaded` passes `crewCount` / `characterKeys`; `agentLabels` takes `avatar` (a file) and calls `os.setAgentAvatar` | Same; the avatar lives in the shell (`officeUiStore.avatars`, by session id) |
+| `webview/src/office/engine/officeState.ts` | 2026-11-11: `setAgentAvatar(id, key)` (keeps the crew palette in `crewPalette`, back to it with no avatar); `getPersistableSeats` saves the crew palette; `addSubagent` hands down the crew look, not the avatar | Same |
+| `webview/src/office/types.ts` | 2026-11-11: `Character.crewPalette?` | Same |
+| `webview/src/office/engine/departments.ts` | 2026-11-11: `labelForms(label)` — a label "Robin's Room · Art" also matches by each part between `·` / `|` / `—`; used by `areaTiersFor`, `venueAreas`, `directorAreas` | Themed rooms (DC maps) keep their department, venue or directors' role |

@@ -1,0 +1,13 @@
+{
+  "id": "HOJ_STATUE_AQUAMAN",
+  "name": "Statue — Aquaman",
+  "category": "decor",
+  "type": "asset",
+  "canPlaceOnWalls": false,
+  "canPlaceOnSurfaces": false,
+  "backgroundTiles": 4,
+  "width": 32,
+  "height": 80,
+  "footprintW": 2,
+  "footprintH": 5
+}

@@ -5,6 +5,7 @@ import { inTauri, ipc } from "../../lib/ipc";
 import { type Catalog, footprints, type RoomLayout, type RoomTemplate, stampRoom, templateFromArea } from "../../lib/rooms";
 import { kindOf, STUDIO_KINDS, type StudioTheme } from "../../lib/studios";
 import { errorText, uiLog } from "../../stores/appStore";
+import { useOfficeUi } from "../../stores/officeUiStore";
 import type { Studio } from "../../types/primeoffice";
 
 const FIELD = "h-7 rounded-md border border-edge bg-canvas/70 px-2 text-[12px] text-ink";
@@ -133,6 +134,7 @@ export function ThemeStudio({ open, studio, onClose, onChanged }: { open: boolea
   const [saveName, setSaveName] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const studioThemes = useOfficeUi((s) => s.studioThemes);
 
   useEffect(() => {
     if (!open || !studio) return;
@@ -157,6 +159,7 @@ export function ThemeStudio({ open, studio, onClose, onChanged }: { open: boolea
   }, [open, studio]);
 
   if (!studio) return null;
+  const current = studioThemes[studio.id] ?? (kindOf(studio.kind).themes[0]?.id ?? "");
   const templates = [...(data?.bundled ?? []), ...mine.map((t) => ({ ...t, mine: true }))];
   const chosen = templates.find((t) => t.id === pick) ?? templates[0];
 
@@ -165,6 +168,7 @@ export function ThemeStudio({ open, studio, onClose, onChanged }: { open: boolea
     loadFloorPlan(theme.file, studio.id)
       .then(() => {
         uiLog("info", `${studio.name}: theme ${theme.label}`);
+        useOfficeUi.getState().setStudioTheme(studio.id, theme.id);
         onClose();
         onChanged();
       })
@@ -229,16 +233,25 @@ export function ThemeStudio({ open, studio, onClose, onChanged }: { open: boolea
                 {k.label}
                 {k.id === studio.kind && <span className="ml-1.5 text-ink-faint">· this studio</span>}
               </div>
-              {k.themes.map((t) => (
-                <div key={t.file} className="flex items-center gap-3 rounded-lg border border-edge p-2">
+              {k.themes.map((t, i) => (
+                <div key={t.file} className="flex flex-col gap-1.5">
+                  {(t.group ?? "Standard") !== (k.themes[i - 1]?.group ?? "Standard") && (
+                    <div className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">{t.group ?? "Standard"}</div>
+                  )}
+                <div className={`flex items-center gap-3 rounded-lg border p-2 ${t.id === current ? "border-accent" : "border-edge"}`}>
                   <PlanThumb file={t.file} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[12.5px] font-medium text-ink">{t.label}</div>
+                    <div className="text-[12.5px] font-medium text-ink">
+                      {t.label}
+                      {t.id === current && <span className="ml-1.5 text-[11px] font-normal text-accent">· on now</span>}
+                      {t.fx && <span className="ml-1.5 text-[11px] font-normal text-ink-faint">· effects</span>}
+                    </div>
                     <div className="mt-0.5">{t.text}</div>
                   </div>
                   <button type="button" className={k.id === studio.kind ? "btn btn-primary" : "btn"} disabled={busy} onClick={() => loadTheme(t)}>
                     Load
                   </button>
+                </div>
                 </div>
               ))}
             </div>

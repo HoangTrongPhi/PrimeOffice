@@ -168,13 +168,16 @@ class Plan:
 
     # ---- pieces ------------------------------------------------------------------------------
     def pod(self, col, row, pc="PC_FRONT_OFF"):
-        """Workstation, 3 x 3: desk (3x2) with a PC, a bench below it. One seat at (col+1, row+2)."""
-        self.put("DESK_FRONT", col, row)
-        self.put(pc, col + 1, row)
-        self.put("CUSHIONED_BENCH", col + 1, row + 2)
+        """Workstation, 3 x 3: desk (3x2) with a PC, a bench below it. One seat at (col+1, row+2).
+        A plan with its own `kit` (desk, pc, chair) uses those pieces instead (the DC themes)."""
+        kit = getattr(self, "kit", None)
+        self.put(kit["desk"] if kit else "DESK_FRONT", col, row)
+        self.put(kit["pc"] if kit else pc, col + 1, row)
+        self.put(kit["chair"] if kit else "CUSHIONED_BENCH", col + 1, row + 2)
 
     def pod_fits(self, col, row):
-        return self.fits("DESK_FRONT", col, row) and self.fits("CUSHIONED_BENCH", col + 1, row + 2)
+        kit = getattr(self, "kit", None)
+        return self.fits(kit["desk"] if kit else "DESK_FRONT", col, row) and self.fits(kit["chair"] if kit else "CUSHIONED_BENCH", col + 1, row + 2)
 
     def team_table(self, col, row):
         """Table (3x4) with two chairs on each side, 5 x 4. Four seats."""
@@ -519,6 +522,469 @@ def video_studio():
     return p
 
 
+# ---- Special themes: the same floor plans, dressed for an occasion or a style ---------------------
+# Each one is Campus or Open Floor room for room (same departments, seats, Pantry, Ban giám đốc), with
+# its own floor and wall colours and themed pieces (scripts/gen-theme-furniture.py). A piece is only
+# kept where every room and seat stays reachable. The effects over the floor (snow, petals, code
+# rain…) are the app's (src/components/office/ThemeFx.tsx), named per theme in src/lib/studios.ts.
+FLOOR_KEYS = ["wood", "blue", "tile", "plum", "teal", "rust", "moss", "slate", "cream"]
+
+
+def col(h, s, b, c):
+    return {"h": h, "s": s, "b": b, "c": c}
+
+
+def palette(*entries):
+    """Floor key -> (pattern, colour), the entries given in FLOOR_KEYS order (cycled)."""
+    return {k: entries[i % len(entries)] for i, k in enumerate(FLOOR_KEYS)}
+
+
+def free_tiles(p):
+    floor = set()
+    for _n, _l, _c, _f, (c0, r0, c1, r1) in p.rooms:
+        floor |= {(c, r) for c in range(c0, c1 + 1) for r in range(r0, r1 + 1)}
+    return floor | set(p.doors)
+
+
+def reachable(p, floor):
+    """Every room and every seat reachable from the start (the rule `build` checks)."""
+    seats = seats_of(p)
+    seat_tiles = {xy for v in seats.values() for xy in v}
+    if p.start in p.blocked:
+        return False
+    seen, todo = {p.start}, [p.start]
+    while todo:
+        c, r = todo.pop()
+        if (c, r) in seat_tiles:
+            continue
+        for dc, dr in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            n = (c + dc, r + dr)
+            if n in floor and n not in seen and (n not in p.blocked or n in seat_tiles):
+                seen.add(n)
+                todo.append(n)
+    if not seat_tiles <= seen:
+        return False
+    return all(any((c, r) in seen for c in range(c0, c1 + 1) for r in range(r0, r1 + 1)) for _n, _l, _c, _f, (c0, r0, c1, r1) in p.rooms)
+
+
+def scatter(p, room, kind, floor):
+    """Put `kind` in the room where it blocks nobody: edges and corners first, never next to a door."""
+    c0, r0, c1, r1 = p.rect(room)
+    e = entry(kind)
+    fw, fh = e["footprintW"], e["footprintH"]
+    near_door = {(dc + x, dr + y) for dc, dr in p.doors for x in (-1, 0, 1) for y in (-1, 0, 1)}
+    spots = [(c, r) for r in range(r0, r1 - fh + 2) for c in range(c0, c1 - fw + 2)]
+    spots.sort(key=lambda cr: (min(cr[0] - c0, c1 - (cr[0] + fw - 1), cr[1] - r0, r1 - (cr[1] + fh - 1)), cr[1], cr[0]))
+    for c, r in spots:
+        cells = {(c + dc, r + dr) for dc in range(fw) for dr in range(fh)}
+        if cells & near_door or not p.fits(kind, c, r):
+            continue
+        n, occupied, blocked = len(p.furniture), set(p.occupied), dict(p.blocked)
+        p._place(kind, c, r)
+        if reachable(p, floor):
+            return True
+        del p.furniture[n:]
+        p.occupied, p.blocked = occupied, blocked
+    return False
+
+
+def dress(p, file, floors, wall, rooms=None, everywhere=(), walls=None, walls_everywhere=()):
+    """Re-skin plan `p` as `file`: colours, then pieces per room, then pieces in every room."""
+    p.file = file
+    p.floors = floors
+    p.wall_color = wall
+    floor = free_tiles(p)
+    names = [r[0] for r in p.rooms]
+    for room, kinds in (rooms or {}).items():
+        for kind in kinds:
+            scatter(p, room, kind, floor)
+    for room in names:
+        for kind in everywhere:
+            scatter(p, room, kind, floor)
+    for room, kinds in (walls or {}).items():
+        wall_decor(p, p.rect(room), kinds)
+    for room in names:
+        wall_decor(p, p.rect(room), list(walls_everywhere))
+    return p
+
+
+def christmas():
+    return dress(
+        game_campus(), "game-christmas.json",
+        palette((7, col(355, 45, -42, -85)), (1, col(205, 18, 18, -70)), (1, col(205, 8, 30, -80)), (7, col(140, 38, -42, -85)),
+                (5, col(200, 10, 22, -60)), (7, col(5, 50, -45, -85)), (1, col(130, 30, -38, -80)), (8, col(0, 45, -10, -30)),
+                (9, col(32, 45, 0, -30))),
+        col(355, 40, -100, -55),
+        rooms={"head": ["XMAS_TREE", "GIFTS", "GIFTS", "SNOWMAN"], "pantry": ["XMAS_TREE", "GIFTS", "SNOWMAN"],
+               "directors": ["XMAS_TREE", "GIFTS"], "meeting": ["GIFTS"]},
+        everywhere=["GIFTS"],
+        walls={"head": ["XMAS_LIGHTS"], "pantry": ["XMAS_LIGHTS"]},
+        walls_everywhere=["WREATH", "XMAS_LIGHTS"],
+    )
+
+
+def halloween():
+    return dress(
+        game_campus(), "game-halloween.json",
+        palette((7, col(25, 50, -58, -85)), (1, col(270, 30, -52, -80)), (6, col(110, 15, -55, -60)), (1, col(285, 40, -48, -80)),
+                (8, col(260, 15, -50, -40)), (7, col(18, 45, -60, -85))),
+        col(275, 35, -115, -55),
+        rooms={"head": ["CAULDRON", "PUMPKIN", "PUMPKIN", "GRAVESTONE"], "pantry": ["CAULDRON", "PUMPKIN"],
+               "directors": ["GRAVESTONE", "PUMPKIN"], "meeting": ["PUMPKIN"]},
+        everywhere=["PUMPKIN", "GRAVESTONE"],
+        walls={"head": ["BAT_GARLAND"], "pantry": ["BAT_GARLAND"]},
+        walls_everywhere=["COBWEB", "BAT_GARLAND"],
+    )
+
+
+def tet():
+    return dress(
+        game_open(), "game-tet.json",
+        palette((7, col(5, 52, -42, -85)), (4, col(42, 55, -5, -55)), (9, col(30, 30, 5, -65)), (1, col(350, 45, -38, -80)),
+                (7, col(20, 45, -45, -85)), (9, col(45, 40, -12, -30))),
+        col(0, 55, -95, -55),
+        rooms={"head": ["PEACH_TREE", "KUMQUAT", "BANH_CHUNG"], "pantry": ["PEACH_TREE", "KUMQUAT", "BANH_CHUNG", "BANH_CHUNG"],
+               "directors": ["PEACH_TREE", "KUMQUAT"], "meeting": ["KUMQUAT"], "community": ["KUMQUAT"]},
+        everywhere=["BANH_CHUNG"],
+        walls={"directors": ["COUPLET", "RED_LANTERN", "COUPLET"]},
+        walls_everywhere=["RED_LANTERN", "COUPLET", "RED_LANTERN"],
+    )
+
+
+def cyberpunk():
+    return dress(
+        game_open(), "game-cyberpunk.json",
+        palette((5, col(290, 40, -64, -55)), (1, col(190, 50, -60, -70)), (4, col(250, 30, -64, -55)), (1, col(310, 55, -56, -80)),
+                (5, col(200, 40, -62, -55))),
+        col(285, 45, -125, -55),
+        rooms={"head": ["HOLO_TERMINAL", "NEON_PALM", "DATA_PILLAR"], "pantry": ["NEON_PALM", "NEON_PALM", "HOLO_TERMINAL"],
+               "directors": ["HOLO_TERMINAL", "NEON_PALM"], "meeting": ["HOLO_TERMINAL"]},
+        everywhere=["DATA_PILLAR", "NEON_PALM"],
+        walls={"directors": ["NEON_SIGN"], "head": ["NEON_SIGN"]},
+        walls_everywhere=["NEON_SIGN"],
+    )
+
+
+def matrix():
+    return dress(
+        game_campus(), "game-matrix.json",
+        palette((4, col(130, 50, -74, -60)), (1, col(125, 40, -70, -80)), (5, col(140, 40, -76, -60)), (4, col(120, 30, -72, -60))),
+        col(130, 40, -135, -55),
+        rooms={"head": ["CRT_STACK", "CRT_STACK", "RETRO_PHONE"], "pantry": ["RETRO_PHONE", "CRT_STACK"],
+               "directors": ["CRT_STACK"], "meeting": ["RETRO_PHONE"]},
+        everywhere=["CRT_STACK"],
+        walls={"head": ["CODE_SCREEN"], "meeting": ["CODE_SCREEN"]},
+        walls_everywhere=["CODE_SCREEN"],
+    )
+
+
+def aquarium():
+    return dress(
+        game_open(), "game-aquarium.json",
+        palette((1, col(42, 40, 5, -80)), (1, col(200, 55, -30, -80)), (5, col(185, 45, -25, -55)), (1, col(220, 50, -40, -80)),
+                (1, col(40, 35, -5, -80)), (4, col(190, 50, -35, -60))),
+        col(205, 55, -90, -55),
+        rooms={"head": ["FISH_TANK", "CORAL", "SEAWEED"], "pantry": ["FISH_TANK", "TREASURE_CHEST", "CORAL", "SEAWEED"],
+               "directors": ["FISH_TANK", "SEAWEED"], "meeting": ["CORAL"]},
+        everywhere=["SEAWEED", "CORAL"],
+        walls_everywhere=["PORTHOLE", "PORTHOLE"],
+    )
+
+
+def hall_of_justice():
+    """DC — Hall of Justice, after the Super Friends' hall and the comics: a marble Great Hall with the
+    founders' statues and their fountain, the Round Table under the alert monitor, and a wing per hero's
+    legacy. Its own map and art (scripts/gen-dc-furniture.py); every department of Campus is here, named
+    "<room> · <department>" so its agents still find it.
+
+        +---------------+------------------------+---------------+
+        | Founders'     | Round Table            | Teleporter    |
+        | Chamber       | (Phong hop)            | Bay (Release) |
+        +---------------+------------------------+---------------+
+        | Themyscira    | GREAT HALL             | Cyborg's Lab  |
+        | (Design)      | statues, fountain,     | (Engineering) |
+        +---------------+ consoles (Studio head) |               |
+        | Hall of       |                        +---------------+
+        | History       +------------------------+ Speed Lab     |
+        +---------------+ Trophy Room (Pantry)   | (Engine lab)  |
+        | Hall of       | Starro                 |               |
+        | Heroes (Loc)  +----------+------+------+---------------+
+        |               | Rock of  |Atlan-| Lantern Corps (QA)   |
+        |               | Eternity |tis   |                      |
+        +---------------+----------+------+----------------------+
+    """
+    p = Plan(
+        "dc-hall-of-justice.json", 54, 49,
+        rooms=[
+            ("directors", "Founders' Chamber · Ban giám đốc", "#7f77dd", "marble_blue", (1, 2, 13, 10)),
+            ("meeting", "Round Table · Phòng họp", "#afa9ec", "marble_blue", (15, 2, 38, 10)),
+            ("release", "Teleporter Bay · Release & ops", "#1d9e75", "tech", (40, 2, 52, 10)),
+            ("design", "Themyscira Hall · Design", "#5dcaa5", "marble", (1, 12, 13, 22)),
+            ("head", None, None, "star", (15, 12, 38, 27)),
+            ("engineering", "Cyborg's Lab · Engineering", "#d85a30", "tech", (40, 12, 52, 25)),
+            ("narrative", "Hall of History · Narrative", "#9fe1cb", "history", (1, 24, 13, 31)),
+            ("engine", "Speed Lab · Engine lab", "#f0997b", "speed", (40, 27, 52, 37)),
+            ("pantry", "Trophy Room · Pantry", "#e0a75e", "marble", (15, 29, 38, 37)),
+            ("community", "Hall of Heroes · Loc & community", "#ef9f27", "marble_blue", (1, 33, 13, 47)),
+            ("art", "Rock of Eternity · Art", "#ed93b1", "rock", (15, 39, 24, 47)),
+            ("audio", "Atlantis Grotto · Audio", "#85b7eb", "sea", (26, 39, 32, 47)),
+            ("qa", "Lantern Corps · QA", "#97c459", "lantern", (34, 39, 52, 47)),
+        ],
+        need=CAMPUS_NEED, start=(26, 22),
+        extra_areas=[("Editor desk", "#f5c4b3", (49, 34, 51, 36))],
+    )
+    p.kit = {"desk": "HOJ_DESK", "pc": "HOJ_MONITOR", "chair": "HOJ_CHAIR"}
+    p.floors = {
+        "marble": (12, col(40, 10, 18, -55)), "marble_blue": (12, col(220, 28, -22, -55)), "star": (13, col(42, 45, -8, -40)),
+        "tech": (11, col(200, 14, -22, -50)), "history": (7, col(30, 40, -40, -85)), "speed": (1, col(0, 45, -36, -80)),
+        "rock": (10, col(30, 8, -38, -40)), "sea": (10, col(195, 40, -36, -45)), "lantern": (12, col(130, 32, -36, -55)),
+    }
+    p.floors["blue"] = p.floors["marble_blue"]
+    p.floors["wood"] = p.floors["marble"]
+    p.wall_color = col(42, 18, -35, -55)
+    put, pod = p.put, p.pod
+    p.door_v(14, 5), p.door_v(39, 5)
+    p.door_h(6, 11), p.door_h(25, 11), p.door_h(29, 11), p.door_h(45, 11)
+    p.door_v(14, 16), p.door_v(39, 16)
+    p.door_h(6, 23), p.door_v(14, 26), p.door_h(45, 26), p.door_h(26, 28)
+    p.door_v(39, 33), p.door_h(6, 32), p.door_v(14, 34), p.door_v(14, 43)
+    p.door_h(19, 38), p.door_h(28, 38), p.door_h(35, 38), p.door_h(45, 38)
+    p.door_v(25, 43), p.door_v(33, 43)
+
+    # Round Table: the founders' seats around it, the alert monitor above.
+    put("HOJ_ROUND_TABLE", 24, 4)
+    for c in range(25, 29):
+        put("HOJ_THRONE", c, 3), put("HOJ_THRONE", c, 7)
+    put("HOJ_THRONE", 23, 5), put("HOJ_THRONE", 30, 5)
+    put("HOJ_TROUBALERT", 24, 0), put("HOJ_EMBLEM", 17, 0), put("HOJ_EMBLEM", 34, 0)
+    for c in (15, 38):
+        put("HOJ_PILLAR", c, 2), put("HOJ_PILLAR", c, 9)
+    # Founders' Chamber.
+    for c in (2, 6, 10):
+        pod(c, 3)
+    put("HOJ_CRYSTAL", 1, 8), put("HOJ_GLOBE", 11, 8)
+    put("HOJ_EMBLEM", 6, 0)
+    for c, h in ((2, "SUPERMAN"), (3, "BATMAN"), (10, "WONDER_WOMAN"), (11, "FLASH")):
+        put(f"HOJ_BANNER_{h}", c, 1)
+    # Teleporter Bay.
+    for c in (41, 45, 49):
+        pod(c, 3)
+    put("HOJ_TELEPORTER", 42, 8), put("HOJ_TELEPORTER", 48, 8)
+    put("HOJ_BANNER_MARTIAN_MANHUNTER", 41, 1), put("HOJ_BANNER_GREEN_ARROW", 51, 1)
+    # Great Hall: consoles for the main sessions, the founders in marble, their fountain.
+    pod(23, 13), pod(27, 13)
+    for c in (19, 23, 27, 31):
+        pod(c, 23)
+    put("HOJ_FOUNTAIN", 25, 18)
+    put("HOJ_STATUE_SUPERMAN", 20, 16), put("HOJ_STATUE_WONDER_WOMAN", 32, 16)
+    for r, (left, right) in zip((12, 17, 22), (("BATMAN", "AQUAMAN"), ("FLASH", "MARTIAN_MANHUNTER"), ("GREEN_LANTERN", "CYBORG"))):
+        put(f"HOJ_STATUE_{left}", 16, r), put(f"HOJ_STATUE_{right}", 36, r)
+    for c in (19, 34):
+        put("HOJ_PILLAR", c, 12), put("HOJ_PILLAR", c, 26)
+    # Themyscira Hall (Wonder Woman).
+    pods(p, p.rect("design"), n=7)
+    put("HOJ_LASSO", 7, 20), put("HOJ_SHIELD", 11, 20)
+    put("HOJ_BANNER_WONDER_WOMAN", 2, 11), put("HOJ_BANNER_WONDER_WOMAN", 10, 11)
+    # Hall of History.
+    for c in (2, 6, 10):
+        pod(c, 25)
+    put("HOJ_ARCHIVE", 2, 29), put("HOJ_ARCHIVE", 10, 29)
+    # Cyborg's Lab.
+    pods(p, p.rect("engineering"), n=10)
+    put("HOJ_MOTHERBOX", 46, 23), put("HOJ_CRYSTAL", 50, 23)
+    put("HOJ_BANNER_CYBORG", 42, 11), put("HOJ_BANNER_CYBORG", 50, 11)
+    # Speed Lab (Flash): the editor desk, the cosmic treadmill, the winged helmet.
+    pod(49, 34)
+    pods(p, p.rect("engine"), n=6)
+    put("HOJ_TREADMILL", 41, 35), put("HOJ_FLASH_HELMET", 46, 35)
+    put("HOJ_BANNER_FLASH", 42, 26), put("HOJ_BANNER_FLASH", 50, 26)
+    # Trophy Room (Pantry): tables, Starro, relics.
+    for c in (21, 29):
+        put("HOJ_TABLE", c, 32)
+        for r in (32, 33):
+            put("HOJ_STOOL", c - 1, r), put("HOJ_STOOL", c + 2, r)
+    put("HOJ_STARRO", 34, 29), put("HOJ_PILLAR", 15, 29), put("HOJ_CRYSTAL", 17, 36), put("HOJ_GLOBE", 36, 35)
+    # Hall of Heroes: more of the league in marble, everyone's banner.
+    for c in (2, 6):
+        pod(c, 34)
+    put("HOJ_STATUE_GREEN_ARROW", 2, 41), put("HOJ_STATUE_HAWKMAN", 6, 41), put("HOJ_PILLAR", 11, 44)
+    for c, h in ((2, "GREEN_ARROW"), (4, "HAWKMAN"), (9, "SHAZAM"), (11, "AQUAMAN")):
+        put(f"HOJ_BANNER_{h}", c, 32)
+    # Rock of Eternity (Shazam).
+    for c in (16, 20):
+        pod(c, 40)
+    put("HOJ_SHAZAM_THRONE", 20, 44), put("HOJ_STATUE_SHAZAM", 15, 43)
+    # Atlantis Grotto (Aquaman).
+    pod(27, 40), pod(27, 43)
+    put("HOJ_TRIDENT", 31, 40), put("HOJ_BANNER_AQUAMAN", 31, 38)
+    # Lantern Corps (Green Lantern).
+    for r in (40, 43):
+        pod(35, r), pod(39, r)
+    put("HOJ_LANTERN", 47, 40)
+    for c in (38, 41, 50):
+        put("HOJ_BANNER_GREEN_LANTERN", c, 38)
+    return p
+
+
+def batcave():
+    """DC — the BatCave, after the films, the comics and the animated series: the cave computer with its
+    giant main screen and the feeds where Batman watches all of Gotham, the suit tubes of the whole
+    Bat-family (Jason's memorial suit among them), the trophy hall (T-rex, penny, Joker card), a full
+    garage, and a room for each of the family. Its own map and art (scripts/gen-dc-furniture.py); every
+    department of Campus is here as "<room> · <department>".
+
+        +-----------+---------------------------------+-----------+
+        | Bat-Family| THE CAVE COMPUTER               | Briefing  |
+        | Council   | main screen + feeds, consoles   | Platform  |
+        +-----------+ (Studio head)                   +-----------+
+        | Nightwing +---------------------------------+ Lucius'   |
+        | (Design)  | Armory: suit tubes              | Workshop  |
+        |           +---------------------------------+ (Eng.)    |
+        +-----------+ Trophy Hall (Pantry)            |           |
+        | Case Files| T-rex, penny, Joker card, tea   +-----------+
+        +----+------+--+------+------------+---------+ Forensics |
+        |Ora-| Robin's  |Comms | Training   |          Lab        |
+        |cle | Room(Art)|      | Ground (QA)+---------------------+
+        |    |          |      |            | Waterfall Cavern     |
+        +----+----------+------+------------+---------------------+
+        | Batmobile Garage (Release & ops): car on its turntable, armoured car, cycle, jet   |
+        +--------------------------------------------------------------------------------------+
+    """
+    p = Plan(
+        "dc-batcave.json", 54, 58,
+        rooms=[
+            ("directors", "Bat-Family Council · Ban giám đốc", "#7f77dd", "rock", (1, 2, 13, 9)),
+            ("head", None, None, "platform", (15, 2, 38, 13)),
+            ("meeting", "Briefing Platform · Phòng họp", "#afa9ec", "platform", (40, 2, 52, 9)),
+            ("design", "Nightwing's Room · Design", "#5dcaa5", "nightwing", (1, 11, 13, 22)),
+            ("armory", "Armory", "#6b7280", "plate", (15, 14, 38, 18)),
+            ("engineering", "Lucius' Workshop · Engineering", "#d85a30", "plate", (40, 11, 52, 24)),
+            ("pantry", "Trophy Hall · Pantry", "#e0a75e", "trophy", (15, 19, 38, 30)),
+            ("narrative", "Case Files · Narrative", "#9fe1cb", "rock", (1, 24, 13, 30)),
+            ("engine", "Forensics Lab · Engine lab", "#f0997b", "lab", (40, 26, 52, 36)),
+            ("community", "Oracle's Nest · Loc & community", "#ef9f27", "oracle", (1, 32, 9, 43)),
+            ("art", "Robin's Room · Art", "#ed93b1", "robin", (11, 32, 19, 43)),
+            ("audio", "Comms Room · Audio", "#85b7eb", "platform", (21, 32, 27, 43)),
+            ("qa", "Training Ground · QA", "#97c459", "mats", (29, 32, 38, 43)),
+            ("cavern", "Waterfall Cavern", "#4b6b8a", "wet", (40, 38, 52, 43)),
+            ("release", "Batmobile Garage · Release & ops", "#1d9e75", "garage", (1, 45, 52, 56)),
+        ],
+        need=CAMPUS_NEED, start=(26, 13),
+        extra_areas=[("Editor desk", "#f5c4b3", (49, 33, 51, 35))],
+    )
+    p.kit = {"desk": "BC_CONSOLE", "pc": "BC_MONITOR", "chair": "BC_CHAIR"}
+    p.floors = {
+        "rock": (10, col(25, 10, -52, -35)), "platform": (11, col(208, 30, -50, -40)), "plate": (11, col(215, 8, -46, -40)),
+        "nightwing": (10, col(215, 38, -50, -40)), "trophy": (10, col(30, 16, -46, -35)), "lab": (4, col(190, 12, -18, -60)),
+        "oracle": (4, col(140, 28, -55, -60)), "robin": (1, col(355, 45, -45, -80)), "mats": (5, col(30, 28, -45, -60)),
+        "wet": (10, col(200, 22, -54, -35)), "garage": (11, col(40, 10, -48, -40)),
+    }
+    p.floors["blue"] = p.floors["platform"]
+    p.floors["wood"] = p.floors["rock"]
+    p.wall_color = col(220, 10, -128, -55)
+    put, pod = p.put, p.pod
+    p.door_v(14, 5), p.door_v(39, 5)
+    p.door_h(6, 10), p.door_h(45, 10)
+    p.door_v(14, 16), p.door_v(39, 16)
+    p.door_h(6, 23), p.door_v(14, 27), p.door_h(45, 25), p.door_v(39, 28)
+    p.door_h(4, 31), p.door_h(15, 31), p.door_h(24, 31), p.door_h(33, 31)
+    p.door_v(10, 36), p.door_v(20, 36), p.door_v(28, 36), p.door_v(39, 40), p.door_h(45, 37)
+    p.door_h(4, 44), p.door_h(15, 44), p.door_h(33, 44), p.door_h(45, 44)
+
+    # The cave computer: the main screen over all of Gotham, the feeds beside it, servers, consoles.
+    put("BC_MAIN_SCREEN", 22, 2)
+    for c, kind in ((17, "C"), (19, "A"), (32, "B"), (34, "C")):
+        put(f"BC_SIDE_SCREEN_{kind}", c, 2)
+    put("BC_SERVER", 15, 2), put("BC_SERVER", 38, 2)
+    for c in (19, 23, 27, 31):
+        pod(c, 7)
+    pod(23, 10), pod(27, 10)
+    put("BC_WALL_MONITOR", 15, 1), put("BC_BAT_COLONY", 36, 1)
+    # Armory: the suits of the family, Jason's memorial suit, the heavy armour.
+    for c, suit in zip((16, 18, 20, 22, 31, 33, 35, 37), ("BATMAN", "ROBIN", "NIGHTWING", "BATGIRL", "BATWOMAN", "RED_HOOD", "MEMORIAL", "ARMOR")):
+        put(f"BC_SUIT_{suit}", c, 14)
+    # Bat-Family Council.
+    for c in (2, 6, 10):
+        pod(c, 3)
+    put("BC_COWL_BUST", 1, 8), put("BC_SERVER", 13, 8)
+    put("BC_WALL_MONITOR", 2, 1), put("BC_STALACTITES", 9, 1)
+    # Briefing Platform: the holo table of Gotham.
+    put("BC_BRIEF_TABLE", 44, 5)
+    for c in range(44, 48):
+        put("BC_STOOL", c, 4), put("BC_STOOL", c, 7)
+    put("BC_WALL_MONITOR", 41, 1), put("BC_WALL_MONITOR", 49, 1), put("BC_SERVER", 52, 2)
+    # Nightwing's Room.
+    pods(p, p.rect("design"), n=7)
+    put("BC_RINGS", 8, 19), put("BC_STALAGMITE", 12, 21)
+    put("BC_NW_EMBLEM", 2, 10), put("BC_ESCRIMA", 10, 10), put("BC_ESCRIMA", 12, 10)
+    # Lucius' Workshop.
+    pods(p, p.rect("engineering"), n=10)
+    put("BC_WORKBENCH", 46, 22)
+    put("BC_TOOL_WALL", 41, 10), put("BC_BATARANGS", 49, 10), put("BC_BATARANGS", 51, 10)
+    # Trophy Hall (Pantry): the T-rex, the penny, the card; Alfred's tea.
+    put("BC_TREX", 16, 19), put("BC_JOKER_CARD", 32, 19), put("BC_PENNY", 35, 19)
+    for c in (22, 29):
+        put("BC_TEA_TABLE", c, 24)
+        for r in (24, 25):
+            put("BC_STOOL", c - 1, r), put("BC_STOOL", c + 2, r)
+    put("BC_TEA_CART", 19, 29), put("BC_STALAGMITE", 37, 28), put("BC_ROCKS", 38, 30)
+    # Case Files.
+    for c in (2, 6, 10):
+        pod(c, 25)
+    put("BC_EVIDENCE", 1, 29), put("BC_EVIDENCE", 12, 29)
+    put("BC_CASE_BOARD", 2, 23), put("BC_CASE_BOARD", 9, 23)
+    # Forensics Lab: the editor desk first.
+    pod(49, 33)
+    pods(p, p.rect("engine"), n=6)
+    put("BC_CENTRIFUGE", 52, 27), put("BC_EVIDENCE", 52, 30)
+    put("BC_CHEM_SHELF", 41, 25), put("BC_CHEM_SHELF", 49, 25)
+    # Oracle's Nest.
+    pod(2, 33), pod(6, 33)
+    put("BC_ORACLE", 2, 38), put("BC_STALAGMITE", 8, 41)
+    # Robin's Room.
+    pod(12, 33), pod(16, 33)
+    put("BC_BUNK", 12, 40), put("BC_DUMMY", 18, 40)
+    put("BC_ROBIN_EMBLEM", 12, 31), put("BC_ROBIN_EMBLEM", 18, 31)
+    # Comms Room.
+    pod(22, 33), pod(22, 36)
+    put("BC_RADIO", 26, 33), put("BC_RADIO", 26, 40)
+    # Training Ground.
+    for r in (33, 36):
+        pod(30, r), pod(34, r)
+    put("BC_SALMON_LADDER", 38, 33)
+    for c in (30, 32, 36):
+        put("BC_DUMMY", c, 41)
+    # Waterfall Cavern: the falls, the bats.
+    put("BC_WATERFALL", 47, 38), put("BC_STALAGMITE", 41, 41), put("BC_ROCKS", 43, 43), put("BC_STALAGMITE", 52, 42)
+    put("BC_BAT_COLONY", 48, 37)
+    # Batmobile Garage: the car on its turntable, the armoured car, the cycle, the jet, the bench.
+    put("BC_TUMBLER", 8, 47), put("BC_BATMOBILE", 19, 48), put("BC_BATCYCLE", 28, 50), put("BC_BATWING", 36, 46)
+    put("BC_CHARGER", 2, 46), put("BC_CHARGER", 14, 47), put("BC_CHARGER", 33, 47)
+    put("BC_TIRES", 2, 55), put("BC_TIRES", 3, 55), put("BC_STALAGMITE", 52, 46), put("BC_ROCKS", 1, 52)
+    for c in (40, 44, 48):
+        pod(c, 53)
+    put("BC_WORKBENCH", 8, 53)
+    for c in (7, 10, 24, 28):
+        put("BC_TOOL_WALL", c, 44)
+    put("BC_BATARANGS", 38, 44)
+    put("BC_WORKBENCH", 12, 53), put("BC_TIRES", 4, 55), put("BC_TIRES", 16, 55), put("BC_CHARGER", 46, 46)
+    # The cave itself: rock and stalagmites along the edges of every room, where nobody walks.
+    floor = free_tiles(p)
+    for room in [r[0] for r in p.rooms]:
+        for kind in ("BC_STALAGMITE", "BC_ROCKS", "BC_STALAGMITE", "BC_ROCKS"):
+            scatter(p, room, kind, floor)
+    for rect in [r[4] for r in p.rooms]:
+        wall_decor(p, rect, ["BC_STALACTITES", "BC_BAT_COLONY"])
+    return p
+
+
+CAMPUS_NEED = {"directors": 3, "meeting": 8, "release": 3, "design": 7, "head": 6, "engineering": 10, "narrative": 3,
+               "pantry": 6, "engine": 6, "community": 2, "art": 2, "audio": 2, "qa": 4}
+
+
+SPECIAL = [christmas, halloween, tet, cyberpunk, matrix, aquarium, hall_of_justice, batcave]
+
+
 # ---- Tiles, colours, areas, checks ----------------------------------------------------------------
 def seats_of(p):
     """Seat tiles per room: a bench, each tile of a sofa, the seat tile of a wooden chair."""
@@ -543,14 +1009,16 @@ def build(p, write=True):
     area_tiles = [None] * (cols * rows)
     idx = lambda c, r: r * cols + c  # noqa: E731
 
+    floors = getattr(p, "floors", FLOORS)
+    wall_color = getattr(p, "wall_color", WALL_COLOR)
     # Walls everywhere from row 1, then rooms carve floors.
     for r in range(1, rows):
         for c in range(cols):
             tiles[idx(c, r)] = WALL
-            colors[idx(c, r)] = WALL_COLOR
+            colors[idx(c, r)] = wall_color
     areas = []
     for _name, label, color, floor, (c0, r0, c1, r1) in p.rooms:
-        tile, col = FLOORS[floor]
+        tile, col = floors[floor]
         for r in range(r0, r1 + 1):
             for c in range(c0, c1 + 1):
                 tiles[idx(c, r)] = tile
@@ -567,7 +1035,7 @@ def build(p, write=True):
     for c, r in p.doors:
         below = tiles[idx(c, r + 1)] if tiles[idx(c, r + 1)] != WALL else tiles[idx(c + 1, r)]
         tiles[idx(c, r)] = below
-        colors[idx(c, r)] = FLOORS["blue"][1] if below == 1 else FLOORS["wood"][1]
+        colors[idx(c, r)] = floors["blue"][1] if below == 1 else floors["wood"][1]
 
     # Checks: every seat inside its room, departments big enough, every room reachable.
     seats = seats_of(p)
@@ -649,4 +1117,6 @@ def build_templates():
 if __name__ == "__main__":
     for plan in (game_campus(), game_open(), video_studio()):
         build(plan)
+    for make in SPECIAL:
+        build(make())
     build_templates()

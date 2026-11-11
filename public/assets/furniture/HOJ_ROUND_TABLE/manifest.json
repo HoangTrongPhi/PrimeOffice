@@ -1,0 +1,13 @@
+{
+  "id": "HOJ_ROUND_TABLE",
+  "name": "The Round Table",
+  "category": "desks",
+  "type": "asset",
+  "canPlaceOnWalls": false,
+  "canPlaceOnSurfaces": false,
+  "backgroundTiles": 0,
+  "width": 96,
+  "height": 48,
+  "footprintW": 6,
+  "footprintH": 3
+}
