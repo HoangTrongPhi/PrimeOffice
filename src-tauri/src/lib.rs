@@ -55,6 +55,7 @@ fn configure<R: Runtime>(builder: Builder<R>, open_with: Option<Result<std::path
             commands::project_cmd::list_projects,
             commands::project_cmd::add_project,
             commands::project_cmd::remove_project,
+            commands::project_cmd::agent_types,
             commands::session_cmd::list_sessions,
             commands::session_cmd::get_session,
             commands::session_cmd::list_providers,

@@ -251,6 +251,8 @@ export interface Character {
   agentName?: string;
   /** PrimeOffice: the task this agent is on (shown instead of the folder). */
   taskName?: string;
+  /** PrimeOffice: what the agent is doing in words, from the shell (thinking, done, waiting on sub-agents). */
+  statusText?: string;
   /** PrimeOffice: the Boss of its project folder. */
   isBoss?: boolean;
   /** PrimeOffice: the crew palette the office picked, kept while an avatar is worn (seats save it). */

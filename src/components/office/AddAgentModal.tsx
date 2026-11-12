@@ -2,6 +2,7 @@ import { Modal } from "@abyss/ui";
 import { Briefcase, Cpu, Crown, FolderOpen, IdCard, Play, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BRIEFING_FILE, firstMessage, ROLES, type Role } from "../../lib/briefing";
+import { bossFor, nextPersonName } from "../../lib/team";
 import { pickPaths } from "../../lib/dialogs";
 import { inTauri, ipc } from "../../lib/ipc";
 import { studioHasProject } from "../../lib/studios";
@@ -31,6 +32,7 @@ const TEMPLATES: { label: string; text: string }[] = [
 ];
 
 const FIELD = "h-8 rounded-md border border-edge bg-canvas/70 px-2 text-[12.5px] text-ink focus:border-accent focus:outline-none";
+/** Sessions of a folder read to find its Boss (newest first). */
 const MODEL_RE = /^[A-Za-z0-9._\-[\]]{1,64}$/;
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -68,7 +70,14 @@ export function AddAgentModal() {
   const [role, setRole] = useState<Role>("boss");
   const [rolePicked, setRolePicked] = useState(false);
   const [busy, setBusy] = useState(false);
-  const bossId = cwd ? bosses[folderKey(cwd)] : undefined;
+  // The agents at work (in the office): the folder's Boss is one of them, else the new agent is it.
+  const office = useOfficeStore((s) => s.agents);
+  const liveIds = useTermStore((s) => s.tabs.filter((t) => t.state !== "ended" && t.sessionId).map((t) => t.sessionId as string).join("|"));
+  const picked = cwd ? bosses[folderKey(cwd)] : undefined;
+  // A pick that left the office (and has no terminal starting) no longer counts: the folder has no
+  // Boss at work, and a new agent there becomes it (lib/team.ts bossFor, the same rule as the Office).
+  const live = liveIds ? liveIds.split("|") : [];
+  const bossId = !cwd ? undefined : bossFor(cwd, picked, office.map((a) => a.session), live);
   const bossSession = useOfficeStore((s) => s.agents.find((a) => a.session.sessionId === bossId)?.session);
   const bossTerm = useTermStore((s) => s.tabs.find((t) => t.sessionId === bossId));
   const bossName = !bossId ? "" : bossSession ? agentName(bossSession, names, bossTerm) : names[bossId] || bossTerm?.name || "";
@@ -99,6 +108,11 @@ export function AddAgentModal() {
     const first = presets.find((p) => p.found);
     if (first && !presets.find((p) => p.id === preset)?.found) setPreset(first.id);
   }, [presets, preset]);
+
+  // Keep the stored Boss in step with the agents at work (adopted, or dropped when gone).
+  useEffect(() => {
+    if (addOpen && cwd && bossId !== picked) useOfficeUi.getState().setBoss(cwd, bossId ?? null);
+  }, [addOpen, cwd, bossId, picked]);
 
   // Claude Code sessions of the folder, to continue one.
   useEffect(() => {
@@ -132,7 +146,10 @@ export function AddAgentModal() {
     .join(" ");
 
   // A shell is not an agent: it gets the task as written.
-  const briefing = { role: shell ? ("solo" as Role) : role, name, bossName, taskName, task };
+  // Every agent has a person's name: an empty field takes the next free one.
+  const autoName = nextPersonName(office.map((a) => agentName(a.session, names)));
+  const personName = name.trim() || autoName;
+  const briefing = { role: shell ? ("solo" as Role) : role, name: personName, bossName, taskName, task };
   const message = firstMessage(briefing);
 
   const start = async () => {
@@ -143,7 +160,7 @@ export function AddAgentModal() {
     const key = await terms.open({
       preset,
       cwd,
-      name,
+      name: personName,
       resume: claude ? resume || null : null,
       newSession: claude && !resume,
       model: shell ? null : model || null,
@@ -154,7 +171,7 @@ export function AddAgentModal() {
     const sessionId = key !== null ? useTermStore.getState().tabs.find((t) => t.key === key)?.sessionId : null;
     if (sessionId) {
       const ui = useOfficeUi.getState();
-      if (name.trim()) ui.setName(sessionId, name);
+      ui.setName(sessionId, personName);
       if (avatar) ui.setAvatar(sessionId, avatar);
       if (taskName.trim()) ui.setTask(sessionId, taskName);
       if (briefing.role === "boss") ui.setBoss(cwd, sessionId);
@@ -215,8 +232,8 @@ export function AddAgentModal() {
         <div className="flex min-w-0 flex-1 flex-col gap-4 border-l border-edge pl-4">
           {section === "identity" && (
             <>
-              <Row label="Name" hint="Shown on its card, in the Command Center and on its terminal tab. Empty: the session's own title, else the CLI and folder.">
-                <input className={FIELD} value={name} maxLength={40} placeholder="e.g. Ada, Build fixer" autoFocus onChange={(e) => setName(e.target.value)} />
+              <Row label="Name" hint="A person's name, shown over its character, on its card and its terminal tab. Empty: the next free name (shown greyed). The session's title is its Master Task.">
+                <input className={FIELD} value={name} maxLength={40} placeholder={autoName} autoFocus onChange={(e) => setName(e.target.value)} />
               </Row>
               <div className="flex flex-col gap-1.5">
                 <span className="text-[12px] font-medium text-ink">Avatar</span>

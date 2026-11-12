@@ -52,6 +52,7 @@ export const ipc = {
   listProjects: () => invoke<ProjectReport[]>("list_projects"),
   addProject: (path: string) => invoke<ProjectReport>("add_project", { path }),
   removeProject: (path: string) => invoke<boolean>("remove_project", { path }),
+  agentTypes: (path: string) => invoke<string[]>("agent_types", { path }),
 
   listSessions: (query: SessionQuery) => invoke<AgentSession[]>("list_sessions", { query }),
   getSession: (path: string) => invoke<AgentSession>("get_session", { path }),

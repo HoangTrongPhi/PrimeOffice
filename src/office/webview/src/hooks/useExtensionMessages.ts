@@ -34,6 +34,9 @@ import { transport } from '../transport/index.js';
 const isHeadlessAgent = (isExternal: boolean | undefined): boolean =>
   isExternal === true && !isBrowserRuntime;
 
+/** PrimeOffice: how long a finished sub-agent stays with its green check before it leaves. */
+const SUBAGENT_DONE_LINGER_MS = 4000;
+
 export interface SubagentCharacter {
   id: number;
   parentAgentId: number;
@@ -318,13 +321,14 @@ export function useExtensionMessages(
       if (msg.type === 'agentLabels') {
         const labels = (msg.labels || {}) as Record<
           string,
-          { name?: string; task?: string; boss?: boolean; avatar?: string }
+          { name?: string; task?: string; boss?: boolean; avatar?: string; status?: string }
         >;
         for (const [id, label] of Object.entries(labels)) {
           const ch = os.characters.get(Number(id));
           if (!ch || ch.isSubagent) continue;
           ch.agentName = label.name || undefined;
           ch.taskName = label.task || undefined;
+          ch.statusText = label.status || undefined;
           os.setAgentAvatar(Number(id), label.avatar);
           // The Boss is the folder's director: it moves to the directors' room.
           os.setAgentBoss(Number(id), label.boss === true);
@@ -709,11 +713,21 @@ export function useExtensionMessages(
           }
           return { ...prev, [id]: next };
         });
-        // Remove sub-agent character
-        os.removeSubagent(id, parentToolId);
-        setSubagentCharacters((prev) =>
-          prev.filter((s) => !(s.parentAgentId === id && s.parentToolId === parentToolId)),
-        );
+        // Remove sub-agent character.
+        // PrimeOffice patch: it shows its green check (its work is done) for a moment first.
+        const remove = () => {
+          os.removeSubagent(id, parentToolId);
+          setSubagentCharacters((prev) =>
+            prev.filter((s) => !(s.parentAgentId === id && s.parentToolId === parentToolId)),
+          );
+        };
+        const doneSubId = os.getSubagentId(id, parentToolId);
+        if (doneSubId !== null) {
+          os.showWaitingBubble(doneSubId, false);
+          setTimeout(remove, SUBAGENT_DONE_LINGER_MS);
+        } else {
+          remove();
+        }
       } else if (msg.type === 'characterSpritesLoaded') {
         const characters = msg.characters as Array<{
           down: string[][][];

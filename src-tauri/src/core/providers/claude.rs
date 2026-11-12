@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use super::{AgentProvider, AgentSession, OpenTool, SubAgentFile, ProviderState, ProviderStatus, SessionAction, SessionParser, SessionStatus};
+use super::{AgentProvider, AgentSession, OpenTool, SubAgentFile, SubTask, ProviderState, ProviderStatus, SessionAction, SessionParser, SessionStatus};
 use crate::core::activity::{clip, describe, one_line};
 
 pub const ID: &str = "claude";
@@ -95,6 +95,8 @@ pub struct ClaudeParser {
     context_tokens: u64,
     actions: VecDeque<SessionAction>,
     open: Vec<OpenTool>,
+    /// Sub-agents ordered with `Agent`/`Task`, oldest first.
+    sub_tasks: Vec<SubTask>,
     turn_ended: bool,
     last: Last,
     /// Reads a sub-agent's own transcript (`<session>/subagents/agent-*.jsonl`): its records are
@@ -168,6 +170,11 @@ impl ClaudeParser {
                         Some("tool_result") => {
                             if let Some(id) = it.get("tool_use_id").and_then(Value::as_str) {
                                 self.open.retain(|o| o.id != id);
+                                // A foreground sub-agent is done when its call returns; a background
+                                // one only says it started (its sidecar says when it ends).
+                                if let Some(t) = self.sub_tasks.iter_mut().find(|t| t.id == id && !t.background) {
+                                    t.done = true;
+                                }
                             }
                             self.last = Last::ToolResult;
                         }
@@ -221,6 +228,12 @@ impl ClaudeParser {
                         let spawn = matches!(tool.as_str(), "Agent" | "Task");
                         let agent_type = if spawn { Some(input.get("subagent_type").and_then(Value::as_str).filter(|t| !t.is_empty()).unwrap_or("general-purpose").to_string()) } else { None };
                         let background = spawn && input.get("run_in_background").and_then(Value::as_bool) == Some(true);
+                        if let Some(t) = &agent_type {
+                            if !self.sidechain && !self.sub_tasks.iter().any(|s| s.id == id) {
+                                let description = input.get("description").and_then(Value::as_str).unwrap_or("").trim().to_string();
+                                self.sub_tasks.push(SubTask { id: id.clone(), agent_type: t.clone(), description, done: false, background });
+                            }
+                        }
                         self.open.push(OpenTool { id, tool: tool.clone(), label: label.clone(), agent_type, background });
                     }
                     self.push_action(SessionAction { at: at.map(str::to_string), kind, tool, label });
@@ -242,7 +255,7 @@ impl ClaudeParser {
             .into_iter()
             .find(|t| !t.trim().is_empty())
             .map(|t| one_line(t, 80))
-            .unwrap_or_else(|| one_line(&self.first_prompt, 60))
+            .unwrap_or_else(|| one_line(&super::task_of(&self.first_prompt), 60))
     }
 
     fn status(&self, modified_ms: u64, now_ms: u64, window_ms: u64) -> SessionStatus {
@@ -283,7 +296,10 @@ impl SessionParser for ClaudeParser {
         let kind = s("type").unwrap_or("");
         let at = s("timestamp");
         if matches!(kind, "user" | "assistant" | "system") {
-            if let Some(c) = s("cwd") {
+            // The folder the session started in: Claude Code files the session under it, and every
+            // client (Claude Desktop too) shows it there. A later `cd` of the agent's shell changes
+            // the records' cwd, not the session's folder (its team, its Boss).
+            if let Some(c) = s("cwd").filter(|_| self.cwd.is_empty()) {
                 self.cwd = c.to_string();
             }
             if let Some(e) = s("entrypoint") {
@@ -339,6 +355,9 @@ impl SessionParser for ClaudeParser {
             max_context_tokens: max_context,
             actions: self.actions.iter().cloned().collect(),
             open_tools: self.open.clone(),
+            team_role: super::team_role(&self.first_prompt),
+            person: super::person_of(&self.first_prompt),
+            sub_tasks: self.sub_tasks.clone(),
         }
     }
 }
@@ -594,6 +613,42 @@ pub mod fixtures {
 mod tests {
     use super::fixtures::*;
     use super::*;
+
+    #[test]
+    fn briefing_gives_the_name_and_the_title_is_the_task() {
+        let first = "You are Batman, the Boss of the agent team working in this folder.\nKeep the team's directives.\n\nYour task: Inventory UI\n\nBuild the inventory screen.";
+        let p = parse(&[user(first, "2026-11-09T06:00:00.000Z")]);
+        let s = p.session(Path::new("s.jsonl"), 0, 1, u64::MAX);
+        assert_eq!((s.person.as_str(), s.title.as_str(), s.team_role.as_str()), ("Batman", "Inventory UI", "boss"));
+        let p = parse(&[user("You are Robin, a member of the agent team working in this folder. The Boss is Batman.\nRead it.\n\nFix the save bug", "2026-11-09T06:00:00.000Z")]);
+        let s = p.session(Path::new("s.jsonl"), 0, 1, u64::MAX);
+        assert_eq!((s.person.as_str(), s.title.as_str()), ("Robin", "Fix the save bug"));
+        // Claude Desktop's title (the session's thumbnail) wins; a plain first message has no name.
+        let p = parse(&[user("Fix the build", "2026-11-09T06:00:00.000Z"), title("Build fix")]);
+        let s = p.session(Path::new("s.jsonl"), 0, 1, u64::MAX);
+        assert_eq!((s.person.as_str(), s.title.as_str()), ("", "Build fix"));
+    }
+
+    #[test]
+    fn foreground_sub_agents_are_ticked_when_their_call_returns() {
+        let at = "2026-11-09T06:00:00.000Z";
+        let mut p = parse(&[user("go", at), tool_use("t1", "Agent", serde_json::json!({ "description": "Find files", "subagent_type": "Explore" }), at), tool_use("t2", "Read", serde_json::json!({ "file_path": "a" }), at)]);
+        let s = p.session(Path::new("s.jsonl"), 0, 1, u64::MAX);
+        assert_eq!(s.sub_tasks.len(), 1);
+        assert_eq!((s.sub_tasks[0].agent_type.as_str(), s.sub_tasks[0].description.as_str(), s.sub_tasks[0].done), ("Explore", "Find files", false));
+        p.feed_line(&tool_result("t1", at));
+        assert!(p.session(Path::new("s.jsonl"), 0, 1, u64::MAX).sub_tasks[0].done);
+    }
+
+    #[test]
+    fn folder_is_where_the_session_started_and_role_comes_from_the_first_message() {
+        let mut p = ClaudeParser::default();
+        p.feed_line(&user("You are Batman, the Boss of the agent team working in this folder.\nKeep it.", "2026-11-12T10:00:00Z"));
+        p.feed_line(&serde_json::json!({ "type": "user", "sessionId": "s1", "cwd": "D:\\Game\\Sub", "timestamp": "2026-11-12T10:01:00Z", "message": { "role": "user", "content": "go on" } }).to_string());
+        let s = p.session(Path::new("s1.jsonl"), 0, 0, 1);
+        assert_eq!(s.cwd, "D:\\Game");
+        assert_eq!(s.team_role, "boss");
+    }
 
     #[test]
     fn conversation_keeps_prompts_replies_and_tools_in_order() {

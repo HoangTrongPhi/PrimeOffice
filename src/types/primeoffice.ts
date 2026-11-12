@@ -72,6 +72,22 @@ export interface AgentSession {
   maxContextTokens: number;
   actions: SessionAction[];
   openTools: OpenTool[];
+  /** Team role its first message gave it (Add agent's briefing text), read from the transcript:
+   *  the same in every client that opens the session. "" or missing = none. */
+  teamRole?: "boss" | "member" | "";
+  /** The agent's name from Add agent's first message ("You are Batman, …"), "" when none. */
+  person?: string;
+  /** Sub-agents the session ordered (Agent/Task calls), oldest first, ticked when done. */
+  subTasks?: SubTask[];
+}
+
+/** A sub-agent a session ordered. */
+export interface SubTask {
+  id: string;
+  agentType: string;
+  description: string;
+  done: boolean;
+  background?: boolean;
 }
 
 /** `session_cmd::SessionQuery`. */

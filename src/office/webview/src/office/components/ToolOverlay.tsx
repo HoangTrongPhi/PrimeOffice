@@ -257,6 +257,8 @@ export function ToolOverlay({
             ch.bubbleType,
             ch.waitingAwaitingInput ?? false,
           );
+          // PrimeOffice patch: no running tool → the shell's words (thinking, done, sub-agents…).
+          if (activityText === 'Idle' && ch.statusText) activityText = ch.statusText;
         }
 
         // Determine dot color

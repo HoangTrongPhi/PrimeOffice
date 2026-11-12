@@ -37,6 +37,8 @@ struct Sub {
     shown: bool,
     /// Ended for good (sidecar says so, or stale): no more reading.
     finished: bool,
+    /// Its work is over (finished, or its turn ended): the parent's sub-task is ticked.
+    ended: bool,
 }
 
 struct Tracked {
@@ -142,7 +144,7 @@ fn sync_subs(provider: &dyn AgentProvider, path: &Path, t: &mut Tracked, now_ms:
             let old = f.finished || now_ms.saturating_sub(mtime) > window;
             let Some(mut parser) = provider.sub_parser() else { return };
             let offset = if old { len } else { read_session_bounded(parser.as_mut(), &f.path).unwrap_or(len) };
-            t.subs.insert(f.path.clone(), Sub { parent_tool_id: f.tool_use_id.clone(), agent_type: f.agent_type.clone(), parser, offset, len, mtime, tools: Vec::new(), shown: !old, finished: old });
+            t.subs.insert(f.path.clone(), Sub { parent_tool_id: f.tool_use_id.clone(), agent_type: f.agent_type.clone(), parser, offset, len, mtime, tools: Vec::new(), shown: !old, finished: old, ended: old });
             if old {
                 continue;
             }
@@ -155,6 +157,7 @@ fn sync_subs(provider: &dyn AgentProvider, path: &Path, t: &mut Tracked, now_ms:
                 out.push(json!({ "type": "subagentClear", "id": id, "parentToolId": sub.parent_tool_id }));
             }
             sub.shown = false;
+            sub.ended = true;
             sub.tools.clear();
             sub.finished = f.finished || s.status == SessionStatus::Stale;
             continue;
@@ -298,7 +301,7 @@ impl Observer {
         // Diff each tracked session against what the office shows.
         let mut gone = Vec::new();
         for (path, t) in self.tracked.iter_mut() {
-            let s = t.parser.session(path, t.mtime, now_ms, window);
+            let mut s = t.parser.session(path, t.mtime, now_ms, window);
             let filtered_out = !seen.contains(path);
             if s.status == SessionStatus::Stale || filtered_out {
                 if t.shown.is_some() {
@@ -362,6 +365,10 @@ impl Observer {
             }
             // Sub-agents, after the parent's tools (its `Agent` call creates their characters).
             sync_subs(self.providers[t.provider].as_ref(), path, t, now_ms, window, &mut out);
+            // A background sub-agent is done when its own transcript says so.
+            for task in s.sub_tasks.iter_mut().filter(|task| !task.done) {
+                task.done = t.subs.values().any(|sub| sub.parent_tool_id == task.id && sub.ended);
+            }
             if s.context_tokens > 0 && s.context_tokens != t.context {
                 out.push(json!({ "type": "agentContextUsage", "id": id, "contextTokens": s.context_tokens, "maxContextTokens": s.max_context_tokens }));
                 t.context = s.context_tokens;
@@ -599,12 +606,16 @@ mod tests {
         append(&file, &fixtures::tool_result("toolu_spawn", at));
         append(&file, &fixtures::reply("Started.", at));
         assert_eq!(types(&obs.tick(now + 2)), ["agentToolDone", "agentToolsClear", "agentStatus"]);
+        let task = |obs: &Observer| obs.agents()[0].1.sub_tasks.clone();
+        assert_eq!(task(&obs).len(), 1, "the old sub-agent is not this session's order");
+        assert!(!task(&obs)[0].done, "a background call returning is not the sub-agent being done");
 
         append(&sub, &fixtures::tool_result("s2", at));
         append(&sub, &fixtures::reply("Inventory done.", at));
         let end = obs.tick(now + 3);
         assert_eq!(types(&end), ["subagentClear"]);
         assert_eq!(end[0]["parentToolId"], "toolu_spawn");
+        assert!(task(&obs)[0].done, "its turn ended: ticked");
         write_meta(&subs, "agent-a1", "toolu_spawn", "gameplay-programmer", true);
         assert!(obs.tick(now + 4).is_empty(), "cleared once");
         assert_eq!(types(&obs.snapshot().1), ["agentStatus", "agentContextUsage"]);

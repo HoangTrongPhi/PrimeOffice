@@ -3,6 +3,7 @@
 // it when a character is clicked); a terminal that has no character yet is selected here.
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { folderKey } from "../lib/briefing";
 import type { AgentSession } from "../types/primeoffice";
 import { useOfficeStore } from "./dataStore";
 import { termName, type TermTab } from "./termStore";
@@ -122,20 +123,17 @@ export function termOf(session: AgentSession, tabs: TermTab[]): TermTab | undefi
   return mine.find((t) => t.state !== "ended") ?? mine.at(-1);
 }
 
-const folderOf = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
-
-/** An office agent's name on screen: the one the user gave it, its terminal's, its title, its folder. */
+/** An office agent's name on screen — always a person's name: the one the user gave it (or the
+ *  Office gave it, `names`), the one its first message gave it, its terminal's. The session's title
+ *  is its Master Task, never its name; "Agent" only until the Office names it. */
 export function agentName(session: AgentSession, names: Record<string, string>, term?: TermTab): string {
-  return names[session.sessionId] || term?.name || session.title || folderOf(session.cwd) || "Agent";
+  return names[session.sessionId] || session.person || term?.name || "Agent";
 }
 
-/** A folder as a key: no trailing separator, one kind of slash, lower case (Windows paths). */
-export function folderKey(cwd: string): string {
-  return cwd.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
-}
+export { folderKey };
 
-/** The task an office agent is on: the one the user gave it, else its session's title (unless that
- *  is already its name), else "" (the office then shows the folder). */
+/** The Master Task of an office agent: the task name the user gave it, else its session's title
+ *  (Claude Desktop's short title for the session, or what its first message asks for), else "". */
 export function agentTask(session: AgentSession, tasks: Record<string, string>, name: string): string {
   return tasks[session.sessionId] || (session.title && session.title !== name ? session.title : "");
 }

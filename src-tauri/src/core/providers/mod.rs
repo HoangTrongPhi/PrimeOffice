@@ -80,6 +80,74 @@ pub struct AgentSession {
     pub max_context_tokens: u64,
     pub actions: Vec<SessionAction>,
     pub open_tools: Vec<OpenTool>,
+    /// Team role typed in the session's first message by Add agent (`src/lib/briefing.ts`):
+    /// "boss", "member" or "" (none). Read from the transcript, so it is the same whichever client
+    /// (PrimeOffice, a terminal, Claude Desktop) opens the session.
+    #[serde(default)]
+    pub team_role: String,
+    /// The agent's own name from that first message ("You are Batman, …"), "" when none was given.
+    #[serde(default)]
+    pub person: String,
+    /// Sub-agents this session started (`Agent`/`Task` calls), oldest first, each ticked when done.
+    #[serde(default)]
+    pub sub_tasks: Vec<SubTask>,
+}
+
+/// A sub-agent the session ordered, and whether it has finished.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubTask {
+    /// The `Agent`/`Task` tool call.
+    pub id: String,
+    pub agent_type: String,
+    pub description: String,
+    pub done: bool,
+    #[serde(default)]
+    pub background: bool,
+}
+
+/// The agent's name in a briefing's first line ("You are Batman, the Boss …" → "Batman").
+pub fn person_of(first_prompt: &str) -> String {
+    if team_role(first_prompt).is_empty() {
+        return String::new();
+    }
+    let head = first_prompt.lines().next().unwrap_or("");
+    head.strip_prefix("You are ").and_then(|r| r.split_once(", ")).map(|(n, _)| n.trim().to_string()).filter(|n| !n.is_empty() && n.chars().count() <= 40).unwrap_or_default()
+}
+
+/// What a first message asks for, without the team text Add agent puts in front of it
+/// (`src/lib/briefing.ts` `firstMessage`: preamble, "Your task: <name>", then the task).
+pub fn task_of(first_prompt: &str) -> String {
+    if team_role(first_prompt).is_empty() {
+        return first_prompt.to_string();
+    }
+    let mut parts = first_prompt.split("\n\n").skip(1).map(str::trim).filter(|p| !p.is_empty());
+    // The rest of the preamble paragraph is joined by single newlines, so after it comes the task.
+    match parts.next() {
+        Some(p) => match p.strip_prefix("Your task: ") {
+            Some(name) => name.lines().next().unwrap_or("").trim().to_string(),
+            None => p.to_string(),
+        },
+        None => String::new(),
+    }
+}
+
+/// Opening lines of the role texts in `src/lib/briefing.ts` (`rolePreamble`); keep them in step.
+const BOSS_MARK: &str = "the Boss of the agent team working in this folder.";
+const MEMBER_MARK: &str = "a member of the agent team working in this folder.";
+
+/// The team role a first message gives its session ("boss", "member" or "").
+pub fn team_role(first_prompt: &str) -> String {
+    let head = first_prompt.lines().next().unwrap_or("");
+    if !head.starts_with("You are ") {
+        String::new()
+    } else if head.contains(BOSS_MARK) {
+        "boss".into()
+    } else if head.contains(MEMBER_MARK) {
+        "member".into()
+    } else {
+        String::new()
+    }
 }
 
 /// Feeds a session's transcript line by line (whole file or new lines only) and says what it shows.
@@ -260,6 +328,16 @@ pub fn detect_folder(id: &str, name: &str, root: &Path, ext: &str, depth: usize,
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn team_role_from_first_message() {
+        use super::team_role;
+        assert_eq!(team_role("You are Batman, the Boss of the agent team working in this folder.\nKeep the team…"), "boss");
+        assert_eq!(team_role("You are the Boss of the agent team working in this folder."), "boss");
+        assert_eq!(team_role("You are Ada, a member of the agent team working in this folder. The Boss is Batman."), "member");
+        assert_eq!(team_role("Fix the build"), "");
+        assert_eq!(team_role("Fix it.\nYou are the Boss of the agent team working in this folder."), "");
+    }
+
     use super::*;
 
     #[test]

@@ -2,6 +2,7 @@ import { PillBadge } from "@abyss/ui";
 import { Activity, Gauge, Send, SquareTerminal, Wrench } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { studioHasProject } from "../../lib/studios";
+import { allDone, subProgress } from "../../lib/team";
 import { currentStudio, useOfficeStore, useProjectStore, useStudioStore } from "../../stores/dataStore";
 import { agentName, selectAgent, selectTerm, termOf, useOfficeUi, type CommandTab } from "../../stores/officeUiStore";
 import { termName, useTermStore } from "../../stores/termStore";
@@ -64,7 +65,10 @@ function Monitor() {
                     <span className={`size-2 shrink-0 rounded-full ${DOT[session.status]}`} />
                     <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">{agentName(session, names, linked)}</span>
                     {linked && linked.state !== "ended" && <SquareTerminal className="size-3 text-accent" />}
-                    <span className="shrink-0 text-[10.5px] text-ink-faint">{STATE_LABEL[session.status]}</span>
+                    <span className={`shrink-0 text-[10.5px] ${allDone(session) && session.subTasks?.length ? "text-emerald" : "text-ink-faint"}`}>
+                      {allDone(session) && session.subTasks?.length ? "✓ All done" : STATE_LABEL[session.status]}
+                      {session.subTasks?.length ? ` · ${subProgress(session).done}/${subProgress(session).total}` : ""}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-[11px] text-ink-muted">
                     <Wrench className="size-3 shrink-0 text-ink-faint" />

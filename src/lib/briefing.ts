@@ -50,6 +50,36 @@ export function rolePreamble({ role, name, bossName }: Pick<Briefing, "role" | "
   return "";
 }
 
+/** A folder as a key: no trailing separator, one kind of slash, lower case (Windows paths). */
+export function folderKey(cwd: string): string {
+  return cwd.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+/** What resolveBoss needs of a session. */
+export interface TeamSession {
+  sessionId: string;
+  cwd: string;
+  teamRole?: string;
+  startedAt?: string | null;
+  modifiedMs?: number;
+}
+
+/**
+ * The Boss of a folder, the same whichever client started or opened its sessions:
+ * 1. the session the user made Boss (Add agent, the agent card), while it is real — it has a
+ *    transcript, or its terminal is still starting / running (no transcript before its first message);
+ * 2. else the newest session of the folder whose first message made it Boss (read from the transcript,
+ *    so a Boss started in a terminal or opened in Claude Desktop counts too);
+ * 3. else none: the next agent added there becomes the Boss.
+ */
+export function resolveBoss(cwd: string, picked: string | undefined, sessions: TeamSession[], live: Iterable<string>): string | undefined {
+  const key = folderKey(cwd);
+  const mine = sessions.filter((s) => folderKey(s.cwd) === key);
+  if (picked && (mine.some((s) => s.sessionId === picked) || [...live].includes(picked))) return picked;
+  const when = (s: TeamSession) => (s.startedAt ? Date.parse(s.startedAt) : NaN) || s.modifiedMs || 0;
+  return mine.filter((s) => s.teamRole === "boss").sort((a, b) => when(b) - when(a))[0]?.sessionId;
+}
+
 /** The whole first message: the role's part, the task name, then the user's task. */
 export function firstMessage(b: Briefing): string {
   const taskName = b.taskName.trim();

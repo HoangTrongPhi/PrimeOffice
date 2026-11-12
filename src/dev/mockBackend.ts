@@ -52,6 +52,12 @@ const SESSIONS: AgentSession[] = [
       { at: iso(10), kind: "run", tool: "Bash", label: "Running: npm test -- inventory" },
     ],
     openTools: [{ id: "t-run", tool: "Bash", label: "Running: npm test -- inventory" }],
+    teamRole: "boss",
+    person: "Batman",
+    subTasks: [
+      { id: "t-sub1", agentType: "Explore", description: "Find every InventoryPanel use", done: true },
+      { id: "t-sub2", agentType: "qa-tester", description: "Write stacking tests", done: false },
+    ],
   }),
   session({
     title: "Save system migration",
@@ -428,6 +434,8 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
           projects = [a.path, ...projects.filter((p) => p !== a.path)];
           await log("info", "project", `${a.path}: checked`);
           return report(a.path);
+        case "agent_types":
+          return ["general-purpose", "Explore", "Plan", "gameplay-programmer", "qa-tester", "writer"];
         case "remove_project": {
           const before = projects.length;
           projects = projects.filter((p) => p !== a.path);

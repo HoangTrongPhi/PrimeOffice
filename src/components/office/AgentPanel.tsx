@@ -1,13 +1,14 @@
 import { EmptyState, Modal } from "@abyss/ui";
-import { Activity, Check, Crown, EyeOff, FolderOpen, Loader2, MessagesSquare, Pencil, SquareTerminal, X } from "lucide-react";
+import { Activity, Check, CheckCircle2, Circle, ClipboardCopy, Crown, EyeOff, FolderOpen, Loader2, MessagesSquare, Pencil, SquareTerminal, UserPlus, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { ChatItem } from "../../lib/chatEvents";
 import { inTauri, ipc } from "../../lib/ipc";
 import { errorText, uiLog, useAppStore } from "../../stores/appStore";
 import { useChatStore } from "../../stores/chatStore";
-import { agentName, isBoss, selectAgent, selectTerm, termOf, useOfficeUi, type AgentTab } from "../../stores/officeUiStore";
+import { allDone, statusText, subAgentOrder, subProgress } from "../../lib/team";
+import { agentName, agentTask, isBoss, selectAgent, selectTerm, termOf, useOfficeUi, type AgentTab } from "../../stores/officeUiStore";
 import { termName, useTermStore, type TermTab } from "../../stores/termStore";
-import type { OfficeAgent } from "../../types/primeoffice";
+import type { AgentSession, OfficeAgent } from "../../types/primeoffice";
 import { ChatItemView } from "../tabs/ChatTab";
 import { folderName, SessionView, StatusPill } from "../session/SessionView";
 import { AvatarPicker, AvatarSprite } from "./AvatarPicker";
@@ -119,6 +120,136 @@ function TermBody({ tab }: { tab: TermTab }) {
   );
 }
 
+/** The sub-agents a session ordered, ticked as each one finishes; "All done" once the turn is over too. */
+function SubAgentList({ session }: { session: AgentSession }) {
+  const list = session.subTasks ?? [];
+  if (!list.length) return null;
+  const { done, total } = subProgress(session);
+  const finished = allDone(session);
+  return (
+    <div className="flex flex-col gap-1 rounded-md border border-edge bg-canvas/40 px-2.5 py-2">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium text-ink-faint">
+        {finished ? <CheckCircle2 className="size-3.5 text-emerald" /> : <Loader2 className={`size-3.5 ${session.status === "active" ? "animate-spin" : ""}`} />}
+        <span className={finished ? "text-emerald" : ""}>{finished ? "All done" : "Sub-agents"}</span>
+        <span className="flex-1" />
+        <span className="tabular-nums">
+          {done}/{total}
+        </span>
+      </div>
+      <ul className="flex max-h-36 flex-col gap-0.5 overflow-y-auto">
+        {list.map((t) => (
+          <li key={t.id} className="flex items-center gap-1.5 text-[11.5px]" title={`${t.agentType}${t.background ? " (background)" : ""}`}>
+            {t.done ? <CheckCircle2 className="size-3.5 shrink-0 text-emerald" /> : <Circle className="size-3.5 shrink-0 text-ink-faint" />}
+            <span className={`min-w-0 flex-1 truncate ${t.done ? "text-ink-faint line-through" : "text-ink"}`}>{t.description || "Subtask"}</span>
+            <span className="shrink-0 font-mono text-[10px] text-ink-faint">{t.agentType}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * The Boss orders a sub-agent: the order is typed into its session (its terminal here, opened with
+ * --resume when it has none), and Claude Code starts the sub-agent with its Agent tool. A session
+ * open in Claude Desktop takes the order there: copy it and paste it into that window.
+ */
+function AddSubAgent({ session, name, open, onClose }: { session: AgentSession; name: string; open: boolean; onClose: () => void }) {
+  const tabs = useTermStore((s) => s.tabs);
+  const [types, setTypes] = useState<string[]>(["general-purpose"]);
+  const [type, setType] = useState("general-purpose");
+  const [title, setTitle] = useState("");
+  const [task, setTask] = useState("");
+  const [note, setNote] = useState("");
+  const linked = termOf(session, tabs);
+  const running = !!linked && linked.state === "running";
+  const desktop = session.entrypoint === "claude-desktop";
+
+  useEffect(() => {
+    if (!open) return;
+    setTitle("");
+    setTask("");
+    setNote("");
+    ipc
+      .agentTypes(session.cwd)
+      .then((t) => t.length && setTypes(t))
+      .catch(() => {});
+  }, [open, session.cwd]);
+
+  const order = subAgentOrder({ type, title, task });
+  const send = async () => {
+    if (!task.trim()) return;
+    if (running && linked && useTermStore.getState().send(linked.key, order)) {
+      uiLog("info", `Order sent to ${name}: ${title || task.slice(0, 40)}`);
+      return onClose();
+    }
+    const key = await useTermStore.getState().open({ preset: "claude", cwd: session.cwd, resume: session.sessionId, name, firstTask: order });
+    if (key !== null) {
+      uiLog("info", `Opened ${name}'s session in a terminal; the order is typed in once it is ready.`);
+      onClose();
+    }
+  };
+  const copy = async () => {
+    if (!task.trim()) return;
+    await navigator.clipboard.writeText(order).catch(() => {});
+    setNote("Copied. Paste it into this session in Claude Desktop.");
+  };
+
+  const field = "h-7 rounded-md border border-edge bg-canvas/70 px-2 text-[12px] text-ink";
+  return (
+    <Modal open={open} title={`Add sub-agent — ordered by ${name}`} onClose={onClose} className="max-w-lg">
+      <form
+        className="flex flex-col gap-3 text-[12.5px] text-ink-muted"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void send();
+        }}
+      >
+        <p>
+          The Boss hands this task to a sub-agent of its own (the Agent tool of Claude Code). The sub-agent walks into its department, works, and shows a green tick when it is done; the Boss shows <b className="text-ink">All done</b> once every sub-agent has finished.
+        </p>
+        <label className="flex items-center gap-2">
+          <span className="w-14 shrink-0 text-ink-faint">Type</span>
+          <select className={`${field} min-w-0 flex-1`} value={type} onChange={(e) => setType(e.target.value)}>
+            {types.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2">
+          <span className="w-14 shrink-0 text-ink-faint">Title</span>
+          <input className={`${field} min-w-0 flex-1`} value={title} maxLength={60} placeholder="e.g. Write stacking tests" onChange={(e) => setTitle(e.target.value)} />
+        </label>
+        <textarea
+          className="min-h-[96px] resize-y rounded-lg border border-edge bg-canvas/70 px-3 py-2 text-[12.5px] text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+          value={task}
+          autoFocus
+          placeholder="What the sub-agent must do, and what done looks like."
+          onChange={(e) => setTask(e.target.value)}
+        />
+        <details>
+          <summary className="cursor-pointer text-[11.5px] text-ink-faint">The order as {name} gets it</summary>
+          <pre className="mt-1 max-h-40 overflow-auto rounded-md bg-canvas/60 p-2 text-[11px] whitespace-pre-wrap text-ink">{order}</pre>
+        </details>
+        {desktop && !running && (
+          <p className="text-[11.5px] text-amber">This session was started in Claude Desktop: if it is open there, give the order there (Copy). Two clients writing one session at once would mix their turns.</p>
+        )}
+        <div className="flex items-center justify-end gap-2">
+          {note && <span className="min-w-0 flex-1 text-[11.5px] text-ink-faint">{note}</span>}
+          <button type="button" className="btn" disabled={!task.trim()} onClick={() => void copy()} title="Copy the order, to paste it into the session in Claude Desktop">
+            <ClipboardCopy className="size-3.5" /> Copy
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={!task.trim()} title={running ? "Type the order into its terminal" : "Open its session in a terminal (claude --resume) and type the order in"}>
+            <UserPlus className="size-3.5" /> {running ? "Send order" : "Open & send"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 /**
  * The selected office agent: who it is, buttons for what can be done with it, and its terminal (when
  * one was opened from the app), its activity and its conversation.
@@ -128,6 +259,7 @@ export function AgentPanel({ agent }: { agent: OfficeAgent }) {
   const tabs = useTermStore((s) => s.tabs);
   const { names, tasks, bosses, avatars, agentTab, setAgentTab, setName, setTask, setBoss, setAvatar } = useOfficeUi();
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(false);
   const avatar = avatars[session.sessionId] ?? "";
   const boss = isBoss(session, bosses);
   const linked = termOf(session, tabs);
@@ -168,25 +300,36 @@ export function AgentPanel({ agent }: { agent: OfficeAgent }) {
             {avatar ? <AvatarSprite file={avatar} scale={1} /> : <Pencil className="size-3 text-ink-faint" />}
           </button>
           <EditableName name={name} onCommit={(n) => (linked && !names[session.sessionId] ? useTermStore.getState().rename(linked.key, n) : setName(session.sessionId, n))} />
-          <StatusPill status={session.status} />
+          {allDone(session) && (session.subTasks?.length ?? 0) > 0 ? (
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald/15 px-2 py-0.5 text-[10.5px] text-emerald" title="Its turn is over and every sub-agent it ordered has finished">
+              <CheckCircle2 className="size-3" /> All done
+            </span>
+          ) : (
+            <StatusPill status={session.status} />
+          )}
           <button type="button" className="icon-btn size-6 shrink-0" title="Back to the Command Center" aria-label="Close" onClick={() => selectAgent(null)}>
             <X className="size-3.5" />
           </button>
         </div>
+        <div className="flex items-baseline gap-1.5 text-[12px]" title="Master Task: the session's short title (the one Claude Desktop shows), or the task name given here">
+          <span className="shrink-0 text-[10.5px] font-medium tracking-wide text-ink-faint uppercase">Master Task</span>
+          <span className="min-w-0 flex-1 truncate text-ink">{agentTask(session, tasks, name) || "—"}</span>
+        </div>
+        <div className="text-[11.5px] text-ink-muted">{statusText(session)}</div>
         <div className="flex flex-wrap gap-x-2 text-[11px] text-ink-faint">
           <span>{PROVIDER[session.provider] ?? session.provider}</span>
           {session.model && <span className="font-mono">{session.model}</span>}
           <span title={session.cwd}>{folderName(session.cwd)}</span>
         </div>
         <div className="flex items-center gap-2 text-[11px] text-ink-faint">
-          <span className="shrink-0">Task</span>
+          <span className="shrink-0">Task name</span>
           <input
             key={tasks[session.sessionId] ?? ""}
             className="h-6 min-w-0 flex-1 rounded border border-edge bg-canvas/70 px-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
             defaultValue={tasks[session.sessionId] ?? ""}
             maxLength={60}
             placeholder={session.title || "e.g. task001"}
-            title="The task shown under its name in the office (only in PrimeOffice). Empty: the session's title."
+            title="Overrides the Master Task shown under its name in the office (only in PrimeOffice). Empty: the session's title."
             onBlur={(e) => setTask(session.sessionId, e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           />
@@ -216,6 +359,17 @@ export function AgentPanel({ agent }: { agent: OfficeAgent }) {
           <button type="button" className="btn" disabled={!session.cwd} onClick={() => void ipc.revealInExplorer(session.cwd).catch((e) => uiLog("error", errorText(e)))} title={`Show ${session.cwd} in Explorer`}>
             <FolderOpen className="size-3.5" /> Folder
           </button>
+          {claude && (
+            <button
+              type="button"
+              className="btn"
+              disabled={!boss}
+              onClick={() => setSubOpen(true)}
+              title={boss ? "Order a sub-agent: the Boss hands it a task" : "Only the folder's Boss orders sub-agents (Crown button above)"}
+            >
+              <UserPlus className="size-3.5" /> Add sub-agent
+            </button>
+          )}
           <button
             type="button"
             className="btn"
@@ -228,6 +382,8 @@ export function AgentPanel({ agent }: { agent: OfficeAgent }) {
             <EyeOff className="size-3.5" /> Hide
           </button>
         </div>
+        <SubAgentList session={session} />
+        {claude && <AddSubAgent session={session} name={name} open={subOpen} onClose={() => setSubOpen(false)} />}
       </div>
 
       <SubTabs

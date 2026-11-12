@@ -30,3 +30,6 @@ diff small; re-apply after every update.
 | `webview/src/office/engine/officeState.ts` | 2026-11-11: `setAgentAvatar(id, key)` (keeps the crew palette in `crewPalette`, back to it with no avatar); `getPersistableSeats` saves the crew palette; `addSubagent` hands down the crew look, not the avatar | Same |
 | `webview/src/office/types.ts` | 2026-11-11: `Character.crewPalette?` | Same |
 | `webview/src/office/engine/departments.ts` | 2026-11-11: `labelForms(label)` — a label "Robin's Room · Art" also matches by each part between `·` / `|` / `—`; used by `areaTiersFor`, `venueAreas`, `directorAreas` | Themed rooms (DC maps) keep their department, venue or directors' role |
+| `webview/src/office/types.ts` | 2026-11-12: `Character.statusText?` | The label says what the agent does when no tool runs (thinking, done, waiting on sub-agents) instead of "Idle" |
+| `webview/src/hooks/useExtensionMessages.ts` | 2026-11-12: `agentLabels` takes `status` → `statusText`; `subagentClear` shows the sub-agent's green check (`showWaitingBubble`) for `SUBAGENT_DONE_LINGER_MS` = 4 s before `removeSubagent` | Same; a finished sub-agent is ticked before it leaves |
+| `webview/src/office/components/ToolOverlay.tsx` | 2026-11-12: a main agent whose activity would read `Idle` shows `statusText` | Same |

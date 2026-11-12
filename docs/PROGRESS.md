@@ -4,6 +4,9 @@
 - Current phase: **0.6.0** released 2026-11-11 on the user's request (avatars by theme, special themes with
   effects, DC BatCave and Hall of Justice with their own maps and art) — signed files in `release/0.6.0`,
   committed, pushed and published by Claude (the user asked for it this time). 0.5.0 was released 2026-11-11.
+- 2026-11-12 — **agent-desktop integration, research only** (nothing built or changed in code): the sub-agent
+  reports are in `docs/AGENT_DESKTOP_NOTES.md` (four reports + the proposed plan D0–D5 in its section 5; waiting for
+  the user's decisions in 5.4, no milestone started).
 - Last session: 2026-11-09 — app built from the template: Rust observer + providers + project check + CLI,
   vendored pixel-agents office in an iframe, Projects / History / Agents modules, generated character crew
 - `npm run check`: green 2026-11-11 (66 Rust tests, 11 TS tests, typecheck, 30/30 commands mocked); `npm run build` green
@@ -190,6 +193,51 @@
   - Checked: `npm run check` green (23 TS tests, 67 Rust, 30/30 mocked), `npm run build` green; `?mock` BatCave loads
     with the new floors, suit tubes, trophies and themed labels; no console errors. **Open:** the real window; the
     user's quality pass; then the 0.6.0 build (version not bumped yet).
+
+- [x] 2026-11-12 **First agent = Boss, in step with Claude Desktop** (user: a new session in a folder with no agent
+  yet must come up as the Boss; check that PrimeOffice and Claude Desktop agree).
+  - Found: the Boss lived only in PrimeOffice's local settings (`officeUiStore.bosses`); a pick whose session never
+    got a transcript (closed / failed before its first message) stayed Boss for good, so the next agent came up as
+    a Member of a ghost; a Boss started outside PrimeOffice had no crown; and the parser kept the **last** record's
+    `cwd`, so an agent that ran `cd` moved to another folder and lost its crown (seen on a real session).
+  - Rust: `AgentSession.team_role` ("boss" | "member" | "") from the first message's marks (`providers::team_role`,
+    same text as `briefing.ts`), Claude + Codex; Claude parser keeps the **first** `cwd` (the folder Claude Code
+    files the session under — what Claude Desktop shows).
+  - TS: `briefing.resolveBoss` (real pick → newest transcript Boss → none), `folderKey` moved to `briefing.ts`;
+    Add agent reads the folder's sessions (newest 60, any CLI), heals the stored Boss, defaults the role from it;
+    Office adopts a transcript Boss for a folder with none. Help topic "Who is the Boss".
+  - Checked: `npm run check` green (25 TS incl. 2 new, 69 Rust incl. 2 new, mock), `npm run build` green; parser run
+    on real transcripts: the PrimeOffice-started Boss session (`entrypoint: cli`) → `boss`, folder = start folder;
+    Claude Desktop sessions (`entrypoint: claude-desktop`) in the same store → no role. Both clients write the same
+    `~/.claude/projects/<folder>/<id>.jsonl`. **Open:** not tried in the real window; Claude Desktop's own UI was
+    not inspected (it does not show PrimeOffice roles — the role lives only in the first message).
+
+- [x] 2026-11-12 **Status, Boss for new sessions, person names / Master Task, Add sub-agent with ticks** (user: the
+  status only ever read "Idle"; a new Claude Code session in a folder with no other agent must be the Boss; the Boss
+  orders sub-agents — there was only Add agent; tick each sub-agent when it is done and the whole job when all are;
+  a session's name is a person's name like Batman, and its session title becomes the Master Task, the short title
+  Claude Desktop shows).
+  - Found: the office label fell back to `Idle` whenever no tool ran (thinking, writing, a finished turn on hover);
+    the shell named agents after the session title (often the role text of the first message).
+  - Rust: `AgentSession.person` (`providers::person_of`, "You are <name>, …"), `sub_tasks` (`SubTask`: each
+    `Agent`/`Task` call, done when a foreground call returns; the observer ticks one whose sub-agent transcript
+    ended); the title falls back to `providers::task_of` (first message without the role text: "Your task: X" or the
+    task). Claude Desktop writes `custom-title` / `agent-name` records = its thumbnail title; that is the Master
+    Task. New command `agent_types(path)` (built-ins + `.claude/agents` of the folder and of the user).
+  - TS: `src/lib/team.ts` — `PERSON_NAMES` / `nextPersonName`, `statusText`, `subProgress` / `allDone`, `bossFor`
+    (pick at work → transcript Boss → first agent in, members aside), `subAgentOrder`. OfficeTab heals the Boss and
+    names every agent; labels carry `status`. `agentName` = names → person → terminal (never the title);
+    AgentPanel: Master Task line, status line, Sub-agents checklist ("All done"), **Add sub-agent** (Boss only;
+    typed into its terminal, or opened with `--resume`; Copy for a session open in Claude Desktop). Add agent uses
+    `bossFor` over the agents at work and fills an empty name with the next free one. Monitor shows "✓ All done · n/n".
+    Office patches in UPSTREAM_PATCHES (status text, sub-agent green check before it leaves).
+  - Checked: `npm run check` green (30 TS incl. new `team.test.ts`, 72 Rust incl. 3 new, 31/31 mocked), `npm run
+    build` green; `?mock`: Batman (person from the transcript), Robin / Nightwing named by the Office, Batman's card
+    shows Master Task "Inventory UI refactor", "Reading … · sub-agents 1/2", the checklist (1 ticked), Add sub-agent
+    lists general-purpose / Explore / Plan / project agents; a sub-agent's green check shows in the office; no
+    console errors. **Open:** not tried in the real window with a real Claude Desktop session; the order sent to a
+    session that is open in Claude Desktop must go through Copy (PrimeOffice never writes into a session another
+    client holds).
 
 ## Decisions (answers to the spec's open questions)
 - 2026-11-09 — Backend: native Rust, no Node sidecar; observe transcripts only, no hooks in 0.1 (user)

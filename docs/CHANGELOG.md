@@ -2,6 +2,27 @@
 
 All user-visible changes. Newest first; one section per released version.
 
+## 0.7.0 — 2026-11-12
+
+- **Status that says what the agent does**: the label over a character no longer reads "Idle" whenever no tool
+  runs — it shows the running tool, **Thinking…**, **Needs approval**, **Waiting for your answer**, **✓ Done**,
+  **Waiting on sub-agents 1/2** or **✓ All done**; "Idle" only when it has been quiet longer than Active in. The
+  agent's card shows the same line.
+- **The Boss, whichever client started it**: a new session (Claude Code, Claude Desktop, a terminal) in a folder
+  with no other agent at work becomes its Boss; when the Boss leaves the office, the first agent still at work
+  there takes the crown. The role is read from the session's first message, so PrimeOffice and Claude Desktop agree;
+  a Boss closed before its first message no longer blocks the folder. A session's folder is where it started.
+- **Person names and the Master Task**: every agent has a person's name (Batman, Robin, Nightwing…) — the one
+  given in Add agent, the one in its first message, or the next free one (rename with the pencil). The session's
+  title is its **Master Task**: the short title Claude Desktop shows for it, else what its first message asks for
+  without the role text.
+- **Add sub-agent** (the Boss's card): the Boss hands a task to a sub-agent — pick its type (general-purpose,
+  Explore, Plan, the agents in `.claude/agents`), a title and the task; the order is typed into the Boss's terminal
+  (opened with `--resume` when it has none), or **Copy** it into Claude Desktop.
+- **Ticks**: the Boss's card lists the sub-agents it ordered and ticks each one when it finishes; once its turn is
+  over and every sub-agent is done it shows **✓ All done** (Command Center too). A finished sub-agent shows a green
+  ✓ in the office for a few seconds before it leaves.
+
 ## 0.6.0 — 2026-11-11
 
 - **Avatars**: Add agent → Identity → **Avatar** picks how the agent looks in the office — Auto (one of the crew,

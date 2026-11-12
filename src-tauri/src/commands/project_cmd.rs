@@ -63,3 +63,59 @@ pub fn remove_project<R: Runtime>(app: AppHandle<R>, path: String) -> Result<boo
     save(&app, &list)?;
     Ok(list.len() != before)
 }
+
+/// Built-in Claude Code sub-agent types, offered before the folder's own.
+const BUILT_IN_AGENTS: &[&str] = &["general-purpose", "Explore", "Plan"];
+
+/// The sub-agent types a Claude Code session in `dir` can start: the built-ins, then
+/// `<dir>/.claude/agents/*.md` and `~/.claude/agents/*.md` (each file's `name:`, else its stem).
+pub fn agent_types_in(dir: &Path, home: Option<&Path>) -> Vec<String> {
+    let mut out: Vec<String> = BUILT_IN_AGENTS.iter().map(|s| s.to_string()).collect();
+    let folders = [Some(dir.join(".claude").join("agents")), home.map(|h| h.join(".claude").join("agents"))];
+    for folder in folders.into_iter().flatten() {
+        let Ok(rd) = std::fs::read_dir(&folder) else { continue };
+        let mut found: Vec<String> = rd
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("md")))
+            .filter_map(|p| {
+                let text = std::fs::read_to_string(&p).unwrap_or_default();
+                let named = text.strip_prefix("---").and_then(|fm| fm.split("\n---").next()).and_then(|fm| fm.lines().find_map(|l| l.trim().strip_prefix("name:").map(|n| n.trim().trim_matches(['"', '\'']).to_string())));
+                named.filter(|n| !n.is_empty()).or_else(|| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
+            })
+            .collect();
+        found.sort_by_key(|n| n.to_lowercase());
+        for n in found {
+            if !out.iter().any(|o| o.eq_ignore_ascii_case(&n)) {
+                out.push(n);
+            }
+        }
+    }
+    out
+}
+
+/// Sub-agent types for the Boss's "Add sub-agent" order.
+#[tauri::command]
+pub fn agent_types(path: String) -> Vec<String> {
+    agent_types_in(Path::new(&path), home_dir().as_deref())
+}
+
+#[cfg(test)]
+mod agent_type_tests {
+    use super::*;
+
+    #[test]
+    fn lists_built_ins_then_the_folder_s_and_the_user_s_agents() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let a = dir.path().join(".claude").join("agents");
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::write(a.join("qa.md"), "---\nname: qa-tester\ndescription: x\n---\nbody").unwrap();
+        std::fs::write(a.join("writer.md"), "no front matter").unwrap();
+        let h = home.path().join(".claude").join("agents");
+        std::fs::create_dir_all(&h).unwrap();
+        std::fs::write(h.join("explore.md"), "---\nname: Explore\n---\n").unwrap();
+        std::fs::write(h.join("reviewer.md"), "---\nname: \"code-reviewer\"\n---\n").unwrap();
+        assert_eq!(agent_types_in(dir.path(), Some(home.path())), ["general-purpose", "Explore", "Plan", "qa-tester", "writer", "code-reviewer"]);
+    }
+}

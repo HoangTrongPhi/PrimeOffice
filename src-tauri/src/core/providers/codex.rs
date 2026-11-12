@@ -269,7 +269,7 @@ impl SessionParser for CodexParser {
         AgentSession {
             provider: ID.into(),
             session_id,
-            title: one_line(&self.first_prompt, 60),
+            title: one_line(&super::task_of(&self.first_prompt), 60),
             cwd: self.cwd.clone(),
             transcript_path: path.to_string_lossy().into_owned(),
             entrypoint: self.entrypoint.clone(),
@@ -285,6 +285,9 @@ impl SessionParser for CodexParser {
             max_context_tokens: if self.context_window > 0 { self.context_window } else { DEFAULT_CONTEXT },
             actions: self.actions.iter().cloned().collect(),
             open_tools: self.open.clone(),
+            team_role: super::team_role(&self.first_prompt),
+            person: super::person_of(&self.first_prompt),
+            sub_tasks: Vec::new(),
         }
     }
 }

@@ -2,13 +2,14 @@ import { Modal, PillBadge } from "@abyss/ui";
 import { Building2, FolderOpen, LayoutGrid, PanelRightClose, PanelRightOpen, Plus, Settings2, Sparkles, Trash2, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { handleHelpKey } from "../../hooks/useGlobalHotkeys";
+import { bossFor, nextPersonName, statusText } from "../../lib/team";
 import { pickPaths } from "../../lib/dialogs";
 import { inTauri } from "../../lib/ipc";
 import { kindOf, planFileOf, projectBlocker, STUDIO_KINDS, studioHasProject, themeOf } from "../../lib/studios";
 import { errorText, uiLog } from "../../stores/appStore";
 import { connectOfficeFrame } from "../../office/bridge/officeBridge";
 import { useOfficeStore, useProjectStore, useStudioStore } from "../../stores/dataStore";
-import { agentName, agentTask, isBoss, selectAgent, termOf, useOfficeUi } from "../../stores/officeUiStore";
+import { agentName, agentTask, folderKey, isBoss, selectAgent, termOf, useOfficeUi } from "../../stores/officeUiStore";
 import { useTermStore } from "../../stores/termStore";
 import { AddAgentModal } from "../office/AddAgentModal";
 import { AgentPanel, TermPanel } from "../office/AgentPanel";
@@ -160,11 +161,35 @@ export function OfficeTab() {
   // The office labels its characters with what the shell knows: the agent's name, its task, the Boss.
   // Sent on every refresh (the frame ignores ids it has no character for yet).
   const { names, tasks, bosses, avatars } = useOfficeUi();
+  // Every folder at work has a Boss: the pick while it is in the office, else the session its
+  // transcript names Boss (started in a terminal, in Claude Desktop…), else the first agent that came
+  // in — a new session in a folder with no other agent is its Boss, whichever client started it.
+  // And every agent has a person's name: one with none gets the next free one (kept, editable).
   useEffect(() => {
-    const labels: Record<number, { name: string; task: string; boss: boolean; avatar?: string }> = {};
+    const sessions = agents.map((a) => a.session);
+    const live = useTermStore
+      .getState()
+      .tabs.filter((t) => t.state !== "ended" && t.sessionId)
+      .map((t) => t.sessionId as string);
+    for (const { session } of agents) {
+      if (!session.cwd) continue;
+      const ui = useOfficeUi.getState();
+      const picked = ui.bosses[folderKey(session.cwd)];
+      const boss = bossFor(session.cwd, picked, sessions, live);
+      if (boss && boss !== picked) ui.setBoss(session.cwd, boss);
+    }
+    for (const { session } of [...agents].sort((a, b) => a.id - b.id)) {
+      const ui = useOfficeUi.getState();
+      if (!session.sessionId || ui.names[session.sessionId] || session.person) continue;
+      const used = agents.map((a) => ui.names[a.session.sessionId] || a.session.person || "").filter(Boolean);
+      ui.setName(session.sessionId, nextPersonName(used));
+    }
+  }, [agents]);
+  useEffect(() => {
+    const labels: Record<number, { name: string; task: string; boss: boolean; avatar?: string; status: string }> = {};
     for (const { id, session } of agents) {
       const name = agentName(session, names, termOf(session, tabs));
-      labels[id] = { name, task: agentTask(session, tasks, name), boss: isBoss(session, bosses), avatar: avatars[session.sessionId] };
+      labels[id] = { name, task: agentTask(session, tasks, name), boss: isBoss(session, bosses), avatar: avatars[session.sessionId], status: statusText(session) };
     }
     labelsRef.current = labels;
     frameRef.current?.contentWindow?.postMessage({ type: "agentLabels", labels }, "*");
