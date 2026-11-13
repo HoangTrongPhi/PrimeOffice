@@ -8,6 +8,7 @@ import { inTauri, ipc, on } from "../lib/ipc";
 import type { TermEvent, TermPreset } from "../types/primeoffice";
 import { errorText, uiLog } from "./appStore";
 import { useProjectStore } from "./dataStore";
+import { sessionTemplate, useSkillStore } from "./skillStore";
 
 export interface TermTab {
   /** Local id (the tab, its screen); the backend's id comes once the terminal is open. */
@@ -36,6 +37,9 @@ export interface OpenOptions {
   newSession?: boolean;
   model?: string | null;
   permissionMode?: string | null;
+  /** Claude Code: start with this skill template only. Unset: the template the session was started
+   *  with (skillStore), so a resumed Boss keeps its skills. */
+  skillTemplate?: string | null;
   name?: string;
   /** Text typed into the program once it has started and gone quiet, then Enter: the agent's
    *  first message. What the user wrote for this agent, after its role's briefing text (lib/briefing.ts)
@@ -165,7 +169,9 @@ export const useTermStore = create<TermState>()(
         const { cols, rows } = screen.term;
         opening++;
         try {
-          const id = await ipc.termOpen({ preset, cwd, cols, rows, sessionId: opts.resume || null, newSessionId, model: opts.model || null, permissionMode: opts.permissionMode || null });
+          const skillTemplate = preset !== "claude" ? null : opts.skillTemplate !== undefined ? opts.skillTemplate || null : sessionTemplate(opts.resume);
+          const id = await ipc.termOpen({ preset, cwd, cols, rows, sessionId: opts.resume || null, newSessionId, model: opts.model || null, permissionMode: opts.permissionMode || null, skillTemplate });
+          if (sessionId) useSkillStore.getState().setSessionTemplate(sessionId, skillTemplate);
           if (!get().tabs.some((t) => t.key === key)) {
             // Closed while it was starting.
             void ipc.termClose(id).catch(() => {});

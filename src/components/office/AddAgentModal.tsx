@@ -9,6 +9,7 @@ import { studioHasProject } from "../../lib/studios";
 import { CHAT_MODELS, CHAT_MODES } from "../../stores/chatStore";
 import { currentStudio, useOfficeStore, useProjectStore, useStudioStore } from "../../stores/dataStore";
 import { agentName, folderKey, selectTerm, useOfficeUi } from "../../stores/officeUiStore";
+import { sessionTemplate, templateForKind, templateSummary, useSkillStore } from "../../stores/skillStore";
 import { useTermStore } from "../../stores/termStore";
 import type { AgentSession } from "../../types/primeoffice";
 import { folderName, relTime } from "../session/SessionView";
@@ -18,7 +19,7 @@ type Section = "identity" | "workspace" | "engine" | "briefing";
 const SECTIONS: { id: Section; label: string; hint: string; icon: LucideIcon }[] = [
   { id: "identity", label: "Identity", hint: "name · avatar", icon: IdCard },
   { id: "workspace", label: "Workspace", hint: "folder · resume", icon: FolderOpen },
-  { id: "engine", label: "Engine", hint: "CLI · model · permissions", icon: Cpu },
+  { id: "engine", label: "Engine", hint: "CLI · model · skills", icon: Cpu },
   { id: "briefing", label: "Briefing", hint: "role · task", icon: Briefcase },
 ];
 
@@ -70,6 +71,10 @@ export function AddAgentModal() {
   const [role, setRole] = useState<Role>("boss");
   const [rolePicked, setRolePicked] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** Skill template for a Boss ("" = none); members take their Boss's. */
+  const [skillTpl, setSkillTpl] = useState("");
+  const skillLibrary = useSkillStore((s) => s.library);
+  const templates = skillLibrary?.templates ?? [];
   // The agents at work (in the office): the folder's Boss is one of them, else the new agent is it.
   const office = useOfficeStore((s) => s.agents);
   const liveIds = useTermStore((s) => s.tabs.filter((t) => t.state !== "ended" && t.sessionId).map((t) => t.sessionId as string).join("|"));
@@ -102,6 +107,11 @@ export function AddAgentModal() {
     setMode("");
     setBusy(false);
     setCwd((c) => c || useTermStore.getState().cwd || folders[0]?.path || "");
+    // The template named like the studio's kind (game, video) is preselected.
+    void useSkillStore
+      .getState()
+      .load()
+      .then((lib) => setSkillTpl(templateForKind(lib?.templates ?? [], currentStudio()?.kind)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addOpen]);
   useEffect(() => {
@@ -132,6 +142,12 @@ export function AddAgentModal() {
   const info = presets.find((p) => p.id === preset);
   const claude = preset === "claude";
   const shell = preset === "shell";
+  // A resumed session keeps the template it was started with; a member works with its Boss's skills.
+  const resumedTpl = resume ? sessionTemplate(resume) : null;
+  const bossTpl = bossId ? sessionTemplate(bossId) : null;
+  const inherits = role === "member" && !!bossId && !resume;
+  const effectiveTpl = !claude ? "" : resume ? (resumedTpl ?? "") : inherits ? (bossTpl ?? "") : skillTpl;
+  const tplInfo = templates.find((t) => t.id === effectiveTpl);
   const modelOk = !model || MODEL_RE.test(model);
   const ready = !!cwd && !!info?.found && modelOk && !busy;
 
@@ -141,6 +157,7 @@ export function AddAgentModal() {
     claude && resume ? `--resume ${resume.slice(0, 8)}…` : claude ? "--session-id <new>" : "",
     model && !shell ? `--model ${model}` : "",
     claude && mode ? `--permission-mode ${mode}` : "",
+    effectiveTpl ? `--plugin-dir …/${effectiveTpl}${skillLibrary?.isolate ? " --setting-sources project,local" : ""}` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -165,6 +182,7 @@ export function AddAgentModal() {
       newSession: claude && !resume,
       model: shell ? null : model || null,
       permissionMode: claude ? mode || null : null,
+      skillTemplate: claude ? effectiveTpl || null : null,
       firstTask: message,
     });
     // Kept by session, so the name, the task and the Boss role outlive the terminal tab.
@@ -325,6 +343,36 @@ export function AddAgentModal() {
                     <input className={`${FIELD} ${modelOk ? "" : "border-rose"}`} value={model} placeholder="CLI default" onChange={(e) => setModel(e.target.value.trim())} />
                   </Row>
                 ))}
+              {claude && (
+                <Row
+                  label="Skill template"
+                  hint={
+                    resume
+                      ? resumedTpl
+                        ? "A resumed session keeps the template it was started with."
+                        : "This session was started without a template; it stays that way."
+                      : inherits
+                        ? bossTpl
+                          ? `A member works with the skills of its Boss (${bossName || "the Boss"}).`
+                          : `The Boss (${bossName || "of this folder"}) has no template, so neither does a member.`
+                        : !templates.length
+                          ? "No template in the skill library yet (Settings → Thư viện skill)."
+                          : effectiveTpl
+                            ? `Only this template's skills are loaded${skillLibrary?.isolate ? " (personal ~/.claude skills off)" : ""}; the Boss's sub-agents use them too.${tplInfo?.issues.some((i) => i.severity !== "info") ? " The template has warnings: see Settings." : ""}`
+                            : "None: Claude Code loads the skills it always does."
+                  }
+                >
+                  <select className={FIELD} value={effectiveTpl} disabled={!!resume || inherits} onChange={(e) => setSkillTpl(e.target.value)}>
+                    <option value="">No template</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} — {templateSummary(t)}
+                      </option>
+                    ))}
+                    {effectiveTpl && !tplInfo && <option value={effectiveTpl}>{effectiveTpl} (not in the library)</option>}
+                  </select>
+                </Row>
+              )}
               {claude && (
                 <Row label="Permissions" hint={mode === "bypassPermissions" ? "Full auto: any command, any file, no question. Only in a folder you can afford to lose." : "In a terminal the agent can ask you: Ask first shows each prompt there."}>
                   <select className={FIELD} value={mode} onChange={(e) => setMode(e.target.value)}>

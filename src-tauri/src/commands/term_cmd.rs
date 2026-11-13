@@ -18,6 +18,7 @@ use serde_json::json;
 use tauri::{AppHandle, Emitter, Runtime, State};
 
 use super::chat_cmd::{installed, is_model, is_session_id, PERMISSION_MODES};
+use super::skills_cmd::{args_for, SkillState};
 use crate::utils::logbus::{self, Level};
 
 /// Event name; keep in sync with `EVENTS.term` in `src/lib/ipc.ts`. Payload: `{ termId, data }` for
@@ -77,6 +78,9 @@ pub struct TermRequest {
     /// Claude Code only: `--permission-mode` (the modes Chat offers).
     #[serde(default)]
     pub permission_mode: Option<String>,
+    /// Claude Code only: start with this skill template of the library only (`skills_cmd::args_for`).
+    #[serde(default)]
+    pub skill_template: Option<String>,
 }
 
 /// The shell of this PC: PowerShell 7, else Windows PowerShell; `$SHELL`, else `sh`.
@@ -278,8 +282,14 @@ pub fn term_presets() -> Vec<TermPreset> {
 
 /// Open a terminal; answers the id its `term://event`s carry.
 #[tauri::command]
-pub fn term_open<R: Runtime>(app: AppHandle<R>, terms: State<'_, TermState>, request: TermRequest) -> Result<u64, String> {
-    let argv = term_argv(&request, |id| PRESETS.iter().find(|p| p.id == id).and_then(program_of))?;
+pub fn term_open<R: Runtime>(app: AppHandle<R>, terms: State<'_, TermState>, skills: State<'_, SkillState>, request: TermRequest) -> Result<u64, String> {
+    let mut argv = term_argv(&request, |id| PRESETS.iter().find(|p| p.id == id).and_then(program_of))?;
+    if let Some(template) = request.skill_template.as_deref().filter(|t| !t.is_empty()) {
+        if request.preset != "claude" {
+            return Err("Only Claude Code takes a skill template".into());
+        }
+        argv.extend(args_for(&app, &skills, template)?);
+    }
     let mut open = terms.terms.lock().map_err(|e| e.to_string())?;
     if open.len() >= MAX_TERMS {
         return Err(format!("{MAX_TERMS} terminals are open already; close one first"));
@@ -332,7 +342,7 @@ mod tests {
     use std::time::Duration;
 
     fn request(cwd: &Path, preset: &str) -> TermRequest {
-        TermRequest { preset: preset.into(), cwd: cwd.to_string_lossy().into_owned(), cols: 80, rows: 24, session_id: None, new_session_id: None, model: None, permission_mode: None }
+        TermRequest { preset: preset.into(), cwd: cwd.to_string_lossy().into_owned(), cols: 80, rows: 24, session_id: None, new_session_id: None, model: None, permission_mode: None, skill_template: None }
     }
 
     #[test]

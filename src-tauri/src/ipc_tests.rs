@@ -184,6 +184,26 @@ fn terminal_refuses_bad_requests_and_unknown_ids() {
     assert_eq!(h.ok("term_close", json!({ "termId": 999 })), false);
 }
 
+#[test]
+fn skill_library_is_created_listed_and_used_only_by_claude() {
+    let h = Harness::new();
+    let lib = tempfile::tempdir().unwrap();
+    let root = lib.path().join("Skills");
+    // The JSON the settings dialog sends.
+    let saved = h.ok("save_skill_library", json!({ "root": s(&root), "isolate": true }));
+    assert_eq!((saved["custom"].as_bool(), saved["isolate"].as_bool(), saved["error"].is_null()), (Some(true), Some(true), true));
+    let ids: Vec<&str> = saved["templates"].as_array().unwrap().iter().map(|t| t["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["game", "video"]);
+    assert!(root.join("HUONG_DAN.md").is_file() && root.join("templates/game/repos").is_dir());
+    assert_eq!(h.ok("skill_library", json!({}))["root"], saved["root"]);
+    assert!(h.invoke("save_skill_library", json!({ "root": "C:\\a&b", "isolate": true })).is_err());
+    let dir = project_tree();
+    assert!(h.invoke("term_open", json!({ "request": { "preset": "shell", "cwd": s(dir.path()), "cols": 80, "rows": 24, "skillTemplate": "game" } })).is_err(), "only Claude Code");
+    assert!(h.invoke("chat_send", json!({ "request": { "cwd": s(dir.path()), "prompt": "hi", "sessionId": null, "model": null, "permissionMode": null, "skillTemplate": "../video" } })).is_err());
+    // Back to the default folder.
+    assert_eq!(h.ok("save_skill_library", json!({ "root": null, "isolate": true }))["custom"], false);
+}
+
 /// A shell through the real commands: its output arrives as `term://event`s, typed keys reach it,
 /// closing it ends it.
 #[test]

@@ -9,7 +9,7 @@
  */
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { AgentSession, OfficeMessage, ProjectCheck, ProjectReport, ProviderStatus, Studios } from "../types/primeoffice";
+import type { AgentSession, OfficeMessage, ProjectCheck, ProjectReport, ProviderStatus, SkillLibrary, Studios } from "../types/primeoffice";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const GAME = "D:\\Projects\\StarHarbor";
@@ -323,6 +323,38 @@ function startOfficeLoop() {
   }, 7000);
 }
 
+const MOCK_LIB = "C:/Users/you/AppData/Local/PrimeOffice/skill-library";
+/** The skill library of skills_cmd: a Game template with its own skills, a plugin and a project repo. */
+let skillLibrary: SkillLibrary = {
+  root: MOCK_LIB,
+  defaultRoot: MOCK_LIB,
+  custom: false,
+  isolate: true,
+  error: null,
+  templates: [
+    {
+      id: "game",
+      name: "Game",
+      description: "Skills for making a game: design, code, art, audio, QA, release.",
+      path: `${MOCK_LIB}/templates/game`,
+      sources: [
+        { kind: "own", name: "game", path: `${MOCK_LIB}/templates/game`, skills: [{ name: "level-design", description: "Blockout and pacing review for a level." }], agents: 2 },
+        { kind: "project", name: "UEHF_Studio", path: `${MOCK_LIB}/templates/game/repos/UEHF_Studio`, skills: ["dev-story", "gate-check", "ue-mcp", "sprint-plan"].map((name) => ({ name, description: "" })), agents: 39 },
+        { kind: "plugin", name: "ue-skills", path: `${MOCK_LIB}/templates/game/repos/ue-skills`, skills: ["ue-gameplay-abilities", "ue-networking-replication"].map((name) => ({ name, description: "" })), agents: 0 },
+      ],
+      issues: [],
+    },
+    {
+      id: "video",
+      name: "Video",
+      description: "Skills for a YouTube / video studio: script, edit, thumbnail, publishing.",
+      path: `${MOCK_LIB}/templates/video`,
+      sources: [],
+      issues: [{ severity: "info", code: "empty-template", message: "No skills yet: add skills/<name>/SKILL.md or clone a repo into repos/" }],
+    },
+  ],
+};
+
 if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
   console.info("mockBackend: active (?mock)");
   // `isTauri()` reads this flag; set it before lib/ipc.ts evaluates `inTauri`.
@@ -567,6 +599,15 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
             // not kept; fine for the mock
           }
           return studios;
+        }
+
+        case "skill_library":
+          return skillLibrary;
+        case "save_skill_library": {
+          const root = (a.root as string | null)?.trim() || null;
+          if (root && /["%!^&|<>]/.test(root)) throw "The folder path may not contain a special character";
+          skillLibrary = { ...skillLibrary, root: root ?? skillLibrary.defaultRoot, custom: !!root, isolate: !!a.isolate };
+          return skillLibrary;
         }
 
         case "plugin:dialog|open":

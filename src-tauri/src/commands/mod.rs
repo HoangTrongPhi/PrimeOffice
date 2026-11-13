@@ -6,6 +6,7 @@ pub mod chat_cmd;
 pub mod office_cmd;
 pub mod project_cmd;
 pub mod session_cmd;
+pub mod skills_cmd;
 pub mod studio_cmd;
 pub mod term_cmd;
 

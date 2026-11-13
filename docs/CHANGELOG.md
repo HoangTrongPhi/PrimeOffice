@@ -2,6 +2,19 @@
 
 All user-visible changes. Newest first; one section per released version.
 
+## Unreleased
+
+- **Skill library**: skill templates (Game, Video, any folder you add) in a fixed structure —
+  `templates/<id>/{skills,agents,repos}` + `TEMPLATE.md`, with `HUONG_DAN.md` / `README.md` on how to clone
+  third-party skill repos into `repos/`. The installer puts the folder next to PrimeOffice; **Settings → Thư viện
+  skill** moves it (the structure is created in the new folder, nothing is overwritten) and lists each template's
+  skills and warnings.
+- **A Boss with one template only**: Add agent → Engine → **Skill template**. Claude Code starts with that
+  template's skills only (`--plugin-dir` / `--add-dir`) and, with **Only this template's skills** on,
+  `--setting-sources project,local`, so personal skills and the other templates are not loaded. Members take
+  their Boss's template; a resumed session (terminal or Chat) keeps the one it started with.
+- Settings no longer runs off a small window: its body scrolls.
+
 ## 0.7.0 — 2026-11-12
 
 - **Status that says what the agent does**: the label over a character no longer reads "Idle" whenever no tool

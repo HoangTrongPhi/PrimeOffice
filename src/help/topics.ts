@@ -625,4 +625,35 @@ const terminal: HelpTopic = {
   ],
 };
 
-export const HELP_TOPICS: HelpTopic[] = [gettingStarted, office, officeLayout, session, chat, projects, history, providers, terminal, cli];
+// ---------------------------------------------------------------- Skill library
+
+const skills: HelpTopic = {
+  id: "skills",
+  title: { vi: "Thư viện skill — bộ skill theo template", en: "Skill library — skills by template" },
+  summary: {
+    vi: "Mỗi template (Game, Video…) là một bộ skill. Boss được thêm với một template chỉ nạp bộ skill đó; sub-agent của Boss dùng chung bộ này, các template khác không được nạp.",
+    en: "Each template (Game, Video…) is a set of skills. A Boss added with a template loads that set only; its sub-agents share it, other templates are not loaded.",
+  },
+  sections: [
+    section(
+      "Cách dùng",
+      "How to use it",
+      tips(
+        ["**Add agent → Engine → Skill template**: chọn template cho Boss. Template trùng tên loại studio (`game`, `video`) được chọn sẵn. Member dùng template của Boss; session tiếp tục (`--resume`) giữ template lúc nó bắt đầu.", "**Add agent → Engine → Skill template**: pick the Boss's template. The one named like the studio's kind (`game`, `video`) is preselected. Members use their Boss's; a resumed session keeps the one it started with."],
+        ["**Settings (Ctrl+,) → Thư viện skill**: xem thư mục, đổi thư mục (cấu trúc được tạo tự động, file có sẵn không bị ghi đè), xem từng template có bao nhiêu skill và cảnh báo.", "**Settings (Ctrl+,) → Skill library**: see the folder, move it (the structure is created, existing files are kept), and see each template's skills and warnings."],
+        ["**Chỉ dùng skill của template** (mặc định bật): thêm `--setting-sources project,local`, nên skill/plugin cá nhân trong `~/.claude` và skill của tài khoản claude.ai không được nạp (cả thiết lập cá nhân của phiên đó). Skill có sẵn của Claude Code (`code-review`, `init`…) vẫn còn.", "**Only this template's skills** (on by default): adds `--setting-sources project,local`, so personal skills/plugins in `~/.claude` and the claude.ai account's skills are not loaded (nor the session's personal settings). Claude Code's built-in skills (`code-review`, `init`…) remain."],
+      ),
+    ),
+    section(
+      "Cấu trúc thư mục",
+      "Folder structure",
+      tips(
+        ["`templates/<id>/skills/<tên>/SKILL.md` — skill của riêng bạn; `agents/` — agent riêng; `repos/` — clone repo bên thứ 3; `TEMPLATE.md` — tên và mô tả. Hướng dẫn đầy đủ: `HUONG_DAN.md` trong thư mục.", "`templates/<id>/skills/<name>/SKILL.md` — your own skills; `agents/` — your agents; `repos/` — third-party clones; `TEMPLATE.md` — name and description. Full guide: `README.md` in the folder."],
+        ["Repo trong `repos/`: plugin (`skills/` hoặc `.claude-plugin/`) → `--plugin-dir`; marketplace (`plugins/*`) → từng plugin; project (`.claude/skills` hoặc `.claude/agents`) → `--add-dir`, nạp cả skill và agent.", "Repos in `repos/`: plugin (`skills/` or `.claude-plugin/`) → `--plugin-dir`; marketplace (`plugins/*`) → each plugin; project (`.claude/skills` or `.claude/agents`) → `--add-dir`, its skills and agents."],
+        ["Skill được gắn lúc phiên khởi chạy: đổi template thì đóng terminal của Boss rồi mở lại.", "Skills are attached when a session starts: after changing the template, close the Boss's terminal and open it again."],
+      ),
+    ),
+  ],
+};
+
+export const HELP_TOPICS: HelpTopic[] = [gettingStarted, office, officeLayout, session, chat, projects, history, providers, terminal, skills, cli];

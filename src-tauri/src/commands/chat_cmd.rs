@@ -44,6 +44,10 @@ pub struct ChatRequest {
     /// `manual` | `acceptEdits` | `plan` | `bypassPermissions`; none = the CLI's default.
     #[serde(default)]
     pub permission_mode: Option<String>,
+    /// Start the turn with this skill template of the library only (`skills_cmd::args_for`); give
+    /// it on every turn of a session that was started with it.
+    #[serde(default)]
+    pub skill_template: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -201,8 +205,11 @@ pub fn chat_cli() -> ChatCli {
 /// Send one message: a new session, or the next turn of `session_id`. Returns the chat id its
 /// `chat://event`s carry.
 #[tauri::command]
-pub fn chat_send<R: Runtime>(app: AppHandle<R>, chat: State<'_, ChatState>, request: ChatRequest) -> Result<u64, String> {
-    let args = turn_args(&request)?;
+pub fn chat_send<R: Runtime>(app: AppHandle<R>, chat: State<'_, ChatState>, skills: State<'_, super::skills_cmd::SkillState>, request: ChatRequest) -> Result<u64, String> {
+    let mut args = turn_args(&request)?;
+    if let Some(template) = request.skill_template.as_deref().filter(|t| !t.is_empty()) {
+        args.extend(super::skills_cmd::args_for(&app, &skills, template)?);
+    }
     let program = claude_cli().ok_or("Claude Code CLI not found. Install it, run `claude` once in a terminal and sign in.")?;
     let session_id = request.session_id.clone().filter(|s| !s.is_empty());
     let mut running = chat.running.lock().map_err(|e| e.to_string())?;
@@ -284,7 +291,7 @@ mod tests {
     }
 
     fn request(cwd: &Path) -> ChatRequest {
-        ChatRequest { cwd: cwd.to_string_lossy().into_owned(), prompt: "Fix the build".into(), session_id: None, model: None, permission_mode: None }
+        ChatRequest { cwd: cwd.to_string_lossy().into_owned(), prompt: "Fix the build".into(), session_id: None, model: None, permission_mode: None, skill_template: None }
     }
 
     #[test]

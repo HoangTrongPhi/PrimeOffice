@@ -22,6 +22,7 @@ fn configure<R: Runtime>(builder: Builder<R>, open_with: Option<Result<std::path
         .manage(commands::office_cmd::OfficeState::default())
         .manage(commands::chat_cmd::ChatState::default())
         .manage(commands::term_cmd::TermState::default())
+        .manage(commands::skills_cmd::SkillState::default())
         .manage(commands::app_cmd::StartupFolder::new(startup_folder))
         .setup(move |app| {
             logbus::emit(
@@ -70,6 +71,8 @@ fn configure<R: Runtime>(builder: Builder<R>, open_with: Option<Result<std::path
             commands::term_cmd::term_write,
             commands::term_cmd::term_resize,
             commands::term_cmd::term_close,
+            commands::skills_cmd::skill_library,
+            commands::skills_cmd::save_skill_library,
         ])
 }
 

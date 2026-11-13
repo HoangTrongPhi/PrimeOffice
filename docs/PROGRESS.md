@@ -239,6 +239,43 @@
     session that is open in Claude Desktop must go through Copy (PrimeOffice never writes into a session another
     client holds).
 
+- **Skill library / templates (2026-11-13, user's request)**: a folder of skill templates the Boss starts with,
+  so it loads one field's skills only (Game, Video…), plus a guide on cloning third-party skill repos into it.
+  - Rust: `core/skills.rs` (fixed structure `templates/<id>/{skills,agents,repos}` + `TEMPLATE.md`,
+    `ensure_structure` never overwrites, `list_templates`, `template_args`: template root and plugins →
+    `--plugin-dir`, `.claude/skills` projects → `--add-dir`, isolate → `--setting-sources project,local`; paths
+    with `" % ! ^ & | < >` refused because npm's `claude.cmd` goes through cmd.exe). `commands/skills_cmd.rs`:
+    `skill_library`, `save_skill_library`, settings in `skills.json` (root, isolate=true by default); the default
+    root is the bundled `skill-library` resource (installer ships `HUONG_DAN.md` + `README.md` from
+    `skill-library/`). `TermRequest` / `ChatRequest` take `skillTemplate` (Claude Code only).
+  - TS: `stores/skillStore.ts` (library + session → template, persisted), Settings section
+    `SkillLibrarySettings.tsx`, Add agent → Engine → Skill template (Boss: preselect = studio kind; member: its
+    Boss's; resume: the session's own), termStore / chatStore pass the session's template on every start. Help
+    topic `skills`. Settings modal capped to the window (abyss-ui `Modal`'s `max-h-full` does not resolve inside
+    its grid backdrop — worth fixing in Abyss for every app).
+  - Checked: `npm run check` green (Rust 78 incl. 5 new skills tests + 1 IPC test; mock covers the 2 new
+    commands); `?mock`: Settings lists Game (own skills, UEHF_Studio project, a plugin) and
+    Video; Add agent → Boss preselects Game, command preview shows `--plugin-dir …/game --setting-sources
+    project,local`; a member shows "The Boss has no template"; no console errors.
+  - **Verified with the real CLI (2.1.322, `claude -p … --model haiku`, dummy templates, 2026-11-13):**
+    `--plugin-dir` with a manifest → skills as `<manifest name>:<skill>`; without a manifest → `<folder>:<skill>`;
+    `--add-dir` loads the folder's `.claude/skills` **and `.claude/agents`** (unprefixed), so the "project agents
+    are not loaded" info issue was wrong and is gone: a project repo now counts its agents and is a source even
+    with `.claude/agents` alone. Without isolation every user plugin and the claude.ai account's skills (46
+    `anthropic-skills:*` here) load too; with `--setting-sources project,local` all of them are gone and only the
+    template's skills plus Claude Code's built-in skills (`code-review`, `init`, `simplify`, `artifact-*`…) remain.
+    Plugin agents load as `<plugin>:<agent>`.
+  - Resume (real CLI): `--resume <id>` with the same template flags keeps only the template's skills. (A resume
+    *without* them cannot be judged from the model's answer: the old skill list is in the transcript; PrimeOffice
+    always passes the session's template again, so that case does not occur.)
+  - User guide PDFs regenerated (`npm run guide`, 11 topics incl. "Thư viện skill"). Found while doing it: the
+    shared `Abyss/scripts/user-guide.mjs` reported success with stale PDFs (headless Edge exits without printing
+    while Edge is open, and the old file passed the exists-check), then crashed removing the profile lockfile. Fixed
+    there: Chrome is tried before Edge, the old PDF is deleted before printing, temp cleanup retries and only warns.
+  - **Open:** a full Boss session in the real PrimeOffice window (Settings section, Add agent → terminal) was not
+    driven: the dev build started fine (`npm run tauri dev`), but screen control was declined, so it is the user's
+    to try.
+
 ## Decisions (answers to the spec's open questions)
 - 2026-11-09 — Backend: native Rust, no Node sidecar; observe transcripts only, no hooks in 0.1 (user)
 - 2026-11-09 — Project standard = "agent + Abyss" (spec §3.2) (user)

@@ -5,6 +5,7 @@ pub mod activity;
 pub mod observer;
 pub mod project;
 pub mod providers;
+pub mod skills;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};

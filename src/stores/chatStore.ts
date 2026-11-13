@@ -7,6 +7,7 @@ import { inTauri, ipc, on } from "../lib/ipc";
 import type { AgentSession, ChatCli, ChatEvent } from "../types/primeoffice";
 import { errorText, uiLog } from "./appStore";
 import { useProjectStore } from "./dataStore";
+import { sessionTemplate } from "./skillStore";
 
 export const CHAT_MODELS: { id: string; label: string }[] = [
   { id: "", label: "Default model" },
@@ -133,7 +134,7 @@ export const useChatStore = create<ChatState>()(
         try {
           // A mode saved by an older version may no longer exist.
           const permissionMode = CHAT_MODES.some((m) => m.id === mode) ? mode : CHAT_MODES[0].id;
-          const chatId = await ipc.chatSend({ cwd, prompt: text, sessionId: view.sessionId, model: model || null, permissionMode });
+          const chatId = await ipc.chatSend({ cwd, prompt: text, sessionId: view.sessionId, model: model || null, permissionMode, skillTemplate: sessionTemplate(view.sessionId) });
           set({ running: chatId });
         } catch (e) {
           const v = get().view;

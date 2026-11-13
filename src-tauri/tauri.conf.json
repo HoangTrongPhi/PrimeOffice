@@ -78,7 +78,9 @@
     "homepage": "https://github.com/HoangTrongPhi/PrimeOffice",
     "resources": {
       "../docs/user-guide/PrimeOffice_User_Guide_vi.pdf": "user-guide/PrimeOffice_User_Guide_vi.pdf",
-      "../docs/user-guide/PrimeOffice_User_Guide_en.pdf": "user-guide/PrimeOffice_User_Guide_en.pdf"
+      "../docs/user-guide/PrimeOffice_User_Guide_en.pdf": "user-guide/PrimeOffice_User_Guide_en.pdf",
+      "../skill-library/HUONG_DAN.md": "skill-library/HUONG_DAN.md",
+      "../skill-library/README.md": "skill-library/README.md"
     }
   },
   "plugins": {

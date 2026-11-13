@@ -187,6 +187,8 @@ export interface ChatRequest {
   model: string | null;
   /** `manual` | `acceptEdits` | `plan` | `bypassPermissions`; null = the CLI's default. */
   permissionMode: string | null;
+  /** Skill template the session was started with (given on every turn); null = none. */
+  skillTemplate?: string | null;
 }
 
 /** Payload of `chat://event`: a stream-json record of the CLI, or the end of its process. */
@@ -229,6 +231,8 @@ export interface TermRequest {
   model?: string | null;
   /** Claude Code only: `--permission-mode`. */
   permissionMode?: string | null;
+  /** Claude Code only: start with this skill template of the library only. */
+  skillTemplate?: string | null;
 }
 
 /** Payload of `term://event`: output of a terminal, or its end (`exit`: the code, null when unknown). */
@@ -249,4 +253,39 @@ export interface ChatCli {
 export interface OfficeFilter {
   projects: string[];
   windowMinutes?: number | null;
+}
+
+/** `core::skills::SkillInfo`: one skill (`SKILL.md` frontmatter). */
+export interface SkillInfo {
+  name: string;
+  description: string;
+}
+
+/** `core::skills::SkillSource`: what a template loads — its own folder, a plugin, or a project repo. */
+export interface SkillSource {
+  kind: "own" | "plugin" | "project";
+  name: string;
+  path: string;
+  skills: SkillInfo[];
+  agents: number;
+}
+
+/** `core::skills::SkillTemplate`: `templates/<id>/` of the skill library. */
+export interface SkillTemplate {
+  id: string;
+  name: string;
+  description: string;
+  path: string;
+  sources: SkillSource[];
+  issues: Issue[];
+}
+
+/** `skills_cmd::SkillLibrary`: the library folder in use, its settings and templates. */
+export interface SkillLibrary {
+  root: string;
+  defaultRoot: string;
+  custom: boolean;
+  isolate: boolean;
+  templates: SkillTemplate[];
+  error: string | null;
 }

@@ -16,6 +16,7 @@ import type {
   ProjectReport,
   ProviderStatus,
   SessionQuery,
+  SkillLibrary,
   Studios,
   TermEvent,
   TermPreset,
@@ -77,6 +78,11 @@ export const ipc = {
   termWrite: (termId: number, data: string) => invoke<boolean>("term_write", { termId, data }),
   termResize: (termId: number, cols: number, rows: number) => invoke<boolean>("term_resize", { termId, cols, rows }),
   termClose: (termId: number) => invoke<boolean>("term_close", { termId }),
+
+  /** The skill library (structure created where missing) and its templates. */
+  skillLibrary: () => invoke<SkillLibrary>("skill_library"),
+  /** Use another library folder (null = the default one) and/or switch "only the template's skills". */
+  saveSkillLibrary: (root: string | null, isolate: boolean) => invoke<SkillLibrary>("save_skill_library", { root, isolate }),
 };
 
 export const on = {
