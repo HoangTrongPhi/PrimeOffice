@@ -2,7 +2,7 @@
 
 All user-visible changes. Newest first; one section per released version.
 
-## Unreleased
+## 0.8.0 — 2026-11-13
 
 - **Skill library**: skill templates (Game, Video, any folder you add) in a fixed structure —
   `templates/<id>/{skills,agents,repos}` + `TEMPLATE.md`, with `HUONG_DAN.md` / `README.md` on how to clone
@@ -12,8 +12,10 @@ All user-visible changes. Newest first; one section per released version.
 - **A Boss with one template only**: Add agent → Engine → **Skill template**. Claude Code starts with that
   template's skills only (`--plugin-dir` / `--add-dir`) and, with **Only this template's skills** on,
   `--setting-sources project,local`, so personal skills and the other templates are not loaded. Members take
-  their Boss's template; a resumed session (terminal or Chat) keeps the one it started with.
+  their Boss's template; a resumed session (terminal or Chat) keeps the one it started with. A repo with
+  `.claude/skills` or `.claude/agents` (e.g. UEHF_Studio) brings both its skills and its agents.
 - Settings no longer runs off a small window: its body scrolls.
+- The user guide PDF (Help) has the new **Thư viện skill** topic.
 
 ## 0.7.0 — 2026-11-12
 

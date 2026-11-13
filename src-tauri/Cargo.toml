@@ -1,6 +1,6 @@
 [package]
 name = "primeoffice"
-version = "0.7.0"
+version = "0.8.0"
 description = "PrimeOffice — Pixel office for your AI coding agents"
 authors = ["Phineas"]
 edition = "2021"
