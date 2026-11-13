@@ -9,3 +9,5 @@ release/
 *.key
 .idea/
 *.tsbuildinfo
+# Skill library templates are personal (cloned repos, copied skills); only the guides are tracked.
+skill-library/templates/
